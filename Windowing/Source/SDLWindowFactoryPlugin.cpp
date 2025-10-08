@@ -1,9 +1,9 @@
 #include "SDLWindowFactoryPlugin.h"
 #include "SDLWindow.h"
 
-namespace SDLWindowing
+namespace Tbx::Plugins::SDLWindowing
 {
-    SDLWindowFactoryPlugin::SDLWindowFactoryPlugin(Tbx::Ref<Tbx::EventBus> eventBus)
+    SDLWindowFactoryPlugin::SDLWindowFactoryPlugin(Ref<EventBus> eventBus)
         : _listener(eventBus)
         , _usingOpenGl(false)
     {
@@ -17,10 +17,10 @@ namespace SDLWindowing
         SDL_Quit(); // If we are unloading our windowing quit all of SDL
     }
 
-    std::shared_ptr<Tbx::Window> SDLWindowFactoryPlugin::Create(const std::string& title, const Tbx::Size& size, const Tbx::WindowMode& mode, Tbx::Ref<Tbx::EventBus> eventBus)
+    std::shared_ptr<Window> SDLWindowFactoryPlugin::Create(const std::string& title, const Size& size, const WindowMode& mode, Ref<EventBus> eventBus)
     {
         auto* sdlWindow = new SDLWindow(_usingOpenGl, eventBus);
-        auto window = std::shared_ptr<Tbx::Window>((Tbx::Window*)sdlWindow, [this](Tbx::Window* win) { DeleteWindow(win); });
+        auto window = std::shared_ptr<Window>((Window*)sdlWindow, [this](Window* win) { DeleteWindow(win); });
 
         // HACK: used to get around enable shared from this issues
         {
@@ -34,12 +34,12 @@ namespace SDLWindowing
         return window;
     }
 
-    void SDLWindowFactoryPlugin::OnAppSettingsChanged(const Tbx::AppSettingsChangedEvent& e)
+    void SDLWindowFactoryPlugin::OnAppSettingsChanged(const AppSettingsChangedEvent& e)
     {
-        _usingOpenGl = e.GetNewSettings().RenderingApi == Tbx::GraphicsApi::OpenGL;
+        _usingOpenGl = e.GetNewSettings().RenderingApi == GraphicsApi::OpenGL;
     }
 
-    void SDLWindowFactoryPlugin::DeleteWindow(Tbx::Window* window)
+    void SDLWindowFactoryPlugin::DeleteWindow(Window* window)
     {
         delete window;
     }

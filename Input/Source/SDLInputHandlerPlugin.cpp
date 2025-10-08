@@ -3,7 +3,7 @@
 #include <Tbx/Debug/Tracers.h>
 #include <cstring>
 
-namespace SDLInput
+namespace Tbx::Plugins::SDLInput
 {
     /* ==== Lifetime ==== */
 
@@ -13,7 +13,7 @@ namespace SDLInput
         return false;
     }
 
-    SDLInputHandlerPlugin::SDLInputHandlerPlugin(Tbx::Ref<Tbx::EventBus> eventBus)
+    SDLInputHandlerPlugin::SDLInputHandlerPlugin(Ref<EventBus> eventBus)
     {
         TBX_ASSERT(SDL_Init(SDL_INIT_GAMEPAD) != 0, "Failed to initialize SDL");
         TBX_ASSERT(SDL_Init(SDL_INIT_HAPTIC) != 0, "Failed to initialize SDL");
@@ -105,18 +105,18 @@ namespace SDLInput
         return curr && prev;
     }
 
-    Tbx::Vector2 SDLInputHandlerPlugin::GetMousePosition() const
+    Vector2 SDLInputHandlerPlugin::GetMousePosition() const
     {
         float x, y;
         SDL_GetMouseState(&x, &y);
-        return Tbx::Vector2(x, y);
+        return Vector2(x, y);
     }
 
-    Tbx::Vector2 SDLInputHandlerPlugin::GetMouseDelta() const
+    Vector2 SDLInputHandlerPlugin::GetMouseDelta() const
     {
         float x_delta, y_delta;
         Uint32 button_state = SDL_GetRelativeMouseState(&x_delta, &y_delta);
-        return Tbx::Vector2(x_delta, y_delta);
+        return Vector2(x_delta, y_delta);
     }
 
     /* ==== Gamepads ==== */

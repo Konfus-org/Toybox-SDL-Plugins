@@ -1,8 +1,8 @@
-#include "SDLGraphicsContexts.h"
+#include "SDLGLGraphicsContext.h"
 #include <Tbx/Debug/Asserts.h>
 #include <glad/glad.h>
 
-namespace SDLGraphicsContext
+namespace Tbx::Plugins::SDLGraphicsContext
 {
     SDLGLGraphicsContext::SDLGLGraphicsContext(SDL_Window* window)
         : _window(window)
@@ -10,7 +10,7 @@ namespace SDLGraphicsContext
         TBX_ASSERT(window, "SDLGLContext: Invalid window given!");
 
         // Load the OpenGL functions using Glad
-        int gladStatus = gladLoadGLLoader((GLADloadproc)context->GetProcAddressLoader());
+        int gladStatus = gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
         TBX_ASSERT(gladStatus, "GL Rendering: Failed to initialize Glad!");
 
         // Set attribute
@@ -58,15 +58,15 @@ namespace SDLGraphicsContext
         int interval = 0;
         switch (mode)
         {
-        case Tbx::VsyncMode::Off:
-            interval = 0;
-            break;
-        case Tbx::VsyncMode::On:
-            interval = 1;
-            break;
-        case Tbx::VsyncMode::Adaptive:
-            interval = -1;
-            break;
+            case VsyncMode::Off:
+                interval = 0;
+                break;
+            case VsyncMode::On:
+                interval = 1;
+                break;
+            case VsyncMode::Adaptive:
+                interval = -1;
+                break;
         }
         SDL_GL_SetSwapInterval(interval);
     }

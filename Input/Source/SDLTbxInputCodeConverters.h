@@ -2,7 +2,7 @@
 #include <Tbx/Input/InputCodes.h>
 #include <SDL3/SDL.h>
 
-namespace SDLInput
+namespace Tbx::Plugins::SDLInput
 {
     // Convert TBX key to SDL_Scancode
     inline SDL_Scancode ConvertKey(int tbxKey)

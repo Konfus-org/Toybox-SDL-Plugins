@@ -2,9 +2,9 @@
 #include <Tbx/Graphics/GraphicsContext.h>
 #include <SDL3/SDL_video.h>
 
-namespace SDLGraphicsContext
+namespace Tbx::Plugins::SDLGraphicsContext
 {
-    class SDLGLGraphicsContext final : public Tbx::IGraphicsContext
+    class SDLGLGraphicsContext final : public IGraphicsContext
     {
     public:
         SDLGLGraphicsContext(SDL_Window* window);
@@ -14,7 +14,7 @@ namespace SDLGraphicsContext
 
         void Present() override;
 
-        void SetVsync(Tbx::VsyncMode mode) override;
+        void SetVsync(VsyncMode mode) override;
 
     private:
         SDL_Window* _window = nullptr;

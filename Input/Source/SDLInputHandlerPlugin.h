@@ -5,14 +5,14 @@
 #include <array>
 #include <unordered_map>
 
-namespace SDLInput
+namespace Tbx::Plugins::SDLInput
 {
     class SDLInputHandlerPlugin final
-        : public Tbx::Plugin
-        , public Tbx::IInputHandler
+        : public Plugin
+        , public IInputHandler
     {
     public:
-        SDLInputHandlerPlugin(Tbx::Ref<Tbx::EventBus> eventBus);
+        SDLInputHandlerPlugin(Ref<EventBus> eventBus);
         ~SDLInputHandlerPlugin() override;
 
         void Update() override;
@@ -29,8 +29,8 @@ namespace SDLInput
         bool IsMouseButtonDown(int button) const override;
         bool IsMouseButtonUp(int button) const override;
         bool IsMouseButtonHeld(int button) const override;
-        Tbx::Vector2 GetMousePosition() const override;
-        Tbx::Vector2 GetMouseDelta() const override;
+        Vector2 GetMousePosition() const override;
+        Vector2 GetMouseDelta() const override;
 
         bool OnSDLEvent(SDL_Event* event);
     

@@ -3,9 +3,9 @@
 #include <Tbx/Debug/Asserts.h>
 #include <SDL3/SDL_video.h>
 
-namespace SDLWindowing
+namespace Tbx::Plugins::SDLWindowing
 {
-    SDLWindow::SDLWindow(bool useOpenGl, Tbx::Ref<Tbx::EventBus> eventBus)
+    SDLWindow::SDLWindow(bool useOpenGl, Ref<EventBus> eventBus)
         :  _eventBus(eventBus), _useOpenGl(useOpenGl)
     {
     }
@@ -15,17 +15,17 @@ namespace SDLWindowing
         Close();
     }
 
-    Tbx::NativeHandle SDLWindow::GetNativeHandle() const
+    NativeHandle SDLWindow::GetNativeHandle() const
     {
         return SDL_GetDisplayForWindow(_window);
     }
 
-    Tbx::NativeWindow SDLWindow::GetNativeWindow() const
+    NativeWindow SDLWindow::GetNativeWindow() const
     {
         return _window;
     }
 
-    void SDLWindow::SetThis(Tbx::WeakRef<Tbx::Window> window)
+    void SDLWindow::SetThis(WeakRef<Window> window)
     {
         _this = window;
     }
@@ -42,7 +42,7 @@ namespace SDLWindowing
 
         switch (_currentMode)
         {
-            using enum Tbx::WindowMode;
+            using enum WindowMode;
             case Windowed:   break;
             case Fullscreen: flags |= SDL_WINDOW_FULLSCREEN; break;
             case Borderless: flags |= SDL_WINDOW_BORDERLESS; break;
@@ -60,7 +60,7 @@ namespace SDLWindowing
 
         _window = SDL_CreateWindow(_title.c_str(), _size.Width, _size.Height, flags);
         TBX_ASSERT(_window, "SDLWindow: SDL_CreateWindow failed: %s", SDL_GetError());
-        _eventBus->Post(Tbx::WindowOpenedEvent(_this.lock()));
+        _eventBus->Post(WindowOpenedEvent(_this.lock()));
     }
 
     void SDLWindow::Close()
@@ -79,7 +79,7 @@ namespace SDLWindowing
             SDL_GL_DestroyContext(_glContext);
         }
 
-        _eventBus->Post(Tbx::WindowClosedEvent(_this.lock()));
+        _eventBus->Post(WindowClosedEvent(_this.lock()));
     }
 
     void SDLWindow::Update()
@@ -99,8 +99,8 @@ namespace SDLWindowing
                 {
                     int w, h;
                     SDL_GetWindowSize(_window, &w, &h);
-                    SetSize(Tbx::Size(w, h));
-                    SetMode(Tbx::WindowMode::Fullscreen);
+                    SetSize(Size(w, h));
+                    SetMode(WindowMode::Fullscreen);
                 }
                 break;
             }
@@ -110,7 +110,7 @@ namespace SDLWindowing
                 {
                     int w, h;
                     SDL_GetWindowSize(_window, &w, &h);
-                    SetSize(Tbx::Size(w, h));
+                    SetSize(Size(w, h));
                 }
                 break;
             }
@@ -145,7 +145,7 @@ namespace SDLWindowing
         {
             SDL_GL_MakeCurrent(_window, _glContext);
         }
-        _eventBus->Post(Tbx::WindowFocusedEvent(_this.lock()));
+        _eventBus->Post(WindowFocusedEvent(_this.lock()));
     }
 
     bool SDLWindow::IsClosed()
@@ -175,12 +175,12 @@ namespace SDLWindowing
         SDL_SetWindowTitle(_window, title.c_str());
     }
 
-    const Tbx::Size& SDLWindow::GetSize() const
+    const Size& SDLWindow::GetSize() const
     {
         return _size;
     }
 
-    void SDLWindow::SetSize(const Tbx::Size& size)
+    void SDLWindow::SetSize(const Size& size)
     {
         _size = size;
 
@@ -190,10 +190,10 @@ namespace SDLWindowing
         }
 
         SDL_SetWindowSize(_window, _size.Width, _size.Height);
-        _eventBus->Post(Tbx::WindowResizedEvent(_this.lock()));
+        _eventBus->Post(WindowResizedEvent(_this.lock()));
     }
 
-    void SDLWindow::SetMode(const Tbx::WindowMode& mode)
+    void SDLWindow::SetMode(const WindowMode& mode)
     {
         _currentMode = mode;
         if (_window == nullptr)
@@ -203,7 +203,7 @@ namespace SDLWindowing
 
         switch (_currentMode)
         {
-            using enum Tbx::WindowMode;
+            using enum WindowMode;
             case Windowed:
             {
                 SDL_SetWindowFullscreen(_window, false);
@@ -230,7 +230,7 @@ namespace SDLWindowing
         }
     }
 
-    Tbx::WindowMode SDLWindow::GetMode()
+    WindowMode SDLWindow::GetMode()
     {
         return _currentMode;
     }
