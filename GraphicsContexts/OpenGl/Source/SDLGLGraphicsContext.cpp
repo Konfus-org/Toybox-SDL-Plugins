@@ -9,10 +9,6 @@ namespace Tbx::Plugins::SDLGraphicsContext
     {
         TBX_ASSERT(window, "SDLGLContext: Invalid window given!");
 
-        // Load the OpenGL functions using Glad
-        int gladStatus = gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
-        TBX_ASSERT(gladStatus, "GL Rendering: Failed to initialize Glad!");
-
         // Set attribute
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
@@ -35,6 +31,9 @@ namespace Tbx::Plugins::SDLGraphicsContext
 
         _glContext = SDL_GL_CreateContext(_window);
         TBX_ASSERT(_glContext, "SDLGLContext: Failed to create gl context for window!");
+        SDL_GL_MakeCurrent(_window, _glContext);
+        int gladStatus = gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
+        TBX_ASSERT(gladStatus, "GL Rendering: Failed to initialize Glad!");
     }
 
     SDLGLGraphicsContext::~SDLGLGraphicsContext()

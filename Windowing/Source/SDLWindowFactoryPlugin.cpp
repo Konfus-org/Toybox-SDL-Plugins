@@ -1,5 +1,6 @@
 #include "SDLWindowFactoryPlugin.h"
 #include "SDLWindow.h"
+#include <SDL3/SDL.h>
 
 namespace Tbx::Plugins::SDLWindowing
 {
