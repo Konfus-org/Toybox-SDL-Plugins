@@ -15,7 +15,7 @@ namespace Tbx::Plugins::SDLInput
         SDLInputHandlerPlugin(Ref<EventBus> eventBus);
         ~SDLInputHandlerPlugin() override;
 
-        void Update() override;
+        void RefreshInputStates() override;
 
         bool IsGamepadButtonDown(int playerIndex, int button) const override;
         bool IsGamepadButtonUp(int playerIndex, int button) const override;
@@ -50,6 +50,8 @@ namespace Tbx::Plugins::SDLInput
 
         Uint32 _currMouseState = 0;
         Uint32 _prevMouseState = 0;
+        Vector2 _mouseDelta = {0, 0};
+        Vector2 _mousePos = {0, 0};
     };
 
     TBX_REGISTER_PLUGIN(SDLInputHandlerPlugin);

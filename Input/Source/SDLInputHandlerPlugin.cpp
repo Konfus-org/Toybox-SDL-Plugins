@@ -33,7 +33,7 @@ namespace Tbx::Plugins::SDLInput
         SDL_QuitSubSystem(SDL_INIT_SENSOR);
     }
 
-    void SDLInputHandlerPlugin::Update()
+    void SDLInputHandlerPlugin::RefreshInputStates()
     {
         // Store previous states
         _prevKeyState = _currKeyState;
@@ -57,6 +57,16 @@ namespace Tbx::Plugins::SDLInput
             std::memcpy(_currKeyState.data(), keyboardState, sizeof(bool) * SDL_SCANCODE_COUNT);
         }
         _currMouseState = SDL_GetMouseState(nullptr, nullptr);
+
+        // Update the mouse pos every frame
+        float x, y;
+        SDL_GetMouseState(&x, &y);
+        _mousePos = Vector2(x, y);
+
+        // Update mouse delta every frame
+        float x_delta, y_delta;
+        Uint32 button_state = SDL_GetRelativeMouseState(&x_delta, &y_delta);
+        _mouseDelta = Vector2(x_delta, y_delta);
     }
 
     /* ==== Keyboard ==== */
@@ -107,16 +117,12 @@ namespace Tbx::Plugins::SDLInput
 
     Vector2 SDLInputHandlerPlugin::GetMousePosition() const
     {
-        float x, y;
-        SDL_GetMouseState(&x, &y);
-        return Vector2(x, y);
+        return _mousePos;
     }
 
     Vector2 SDLInputHandlerPlugin::GetMouseDelta() const
     {
-        float x_delta, y_delta;
-        Uint32 button_state = SDL_GetRelativeMouseState(&x_delta, &y_delta);
-        return Vector2(x_delta, y_delta);
+        return _mouseDelta;
     }
 
     /* ==== Gamepads ==== */
