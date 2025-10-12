@@ -52,6 +52,11 @@ namespace Tbx::Plugins::SDL
 
     SDL3AudioPlugin::~SDL3AudioPlugin()
     {
+        if (_device != 0)
+        {
+            SDL_PauseAudioDevice(_device);
+        }
+
         for (auto& [_, playback] : _playbackInstances)
         {
             DestroyPlayback(playback);
@@ -60,7 +65,6 @@ namespace Tbx::Plugins::SDL
 
         if (_device != 0)
         {
-            SDL_PauseAudioDevice(_device);
             SDL_CloseAudioDevice(_device);
             _device = 0;
         }
@@ -75,7 +79,10 @@ namespace Tbx::Plugins::SDL
             return;
         }
 
-        SDL_UnbindAudioStream(instance.Stream);
+        if (_device != 0)
+        {
+            SDL_UnbindAudioStream(instance.Stream);
+        }
         SDL_ClearAudioStream(instance.Stream);
         SDL_DestroyAudioStream(instance.Stream);
         instance.Stream = nullptr;
