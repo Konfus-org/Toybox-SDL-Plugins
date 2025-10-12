@@ -39,11 +39,12 @@ namespace Tbx::Plugins::SDL
             float Speed = 1.0f;
             float Volume = 1.0f;
             bool Loop = false;
+            bool IsPlaying = false;
         };
 
-        void ApplyStreamTuning(PlaybackInstance& instance) const;
-        void DestroyPlayback(PlaybackInstance& instance);
+        void ApplyStreamTuning(PlaybackInstance& instance, const Audio& audio);
         bool QueueAudioData(SDL_AudioStream* stream, const Audio& audio);
+        void DestroyPlayback(PlaybackInstance& instance);
 
         static bool IsSupportedExtension(const std::filesystem::path& path);
         static AudioFormat ConvertSpecToFormat(const SDL_AudioSpec& spec);

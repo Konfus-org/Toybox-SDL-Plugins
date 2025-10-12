@@ -72,27 +72,13 @@ namespace Tbx::Plugins::SDL
         }
     }
 
-    void SDL3AudioPlugin::DestroyPlayback(PlaybackInstance& instance)
-    {
-        if (!instance.Stream)
-        {
-            return;
-        }
-
-        SDL_UnbindAudioStream(instance.Stream);
-        SDL_ClearAudioStream(instance.Stream);
-        SDL_DestroyAudioStream(instance.Stream);
-        instance.Stream = nullptr;
-    }
-
     void SDL3AudioPlugin::Play(const Audio& audio)
     {
         auto it = _playbackInstances.find(audio.Id);
         if (it != _playbackInstances.end())
         {
             auto& instance = it->second;
-            ApplyStreamTuning(instance);
-
+            instance.IsPlaying = true;
             if (instance.Stream && instance.Loop)
             {
                 const int queued = SDL_GetAudioStreamQueued(instance.Stream);
@@ -150,7 +136,6 @@ namespace Tbx::Plugins::SDL
             SDL_DestroyAudioStream(stream);
             return;
         }
-        ApplyStreamTuning(instance);
 
         _playbackInstances.emplace(audio.Id, instance);
     }
@@ -163,6 +148,7 @@ namespace Tbx::Plugins::SDL
             return;
         }
 
+        it->second.IsPlaying = false;
         DestroyPlayback(it->second);
         _playbackInstances.erase(it);
     }
@@ -176,7 +162,7 @@ namespace Tbx::Plugins::SDL
         }
 
         it->second.Pitch = pitch;
-        ApplyStreamTuning(it->second);
+        ApplyStreamTuning(it->second, audio);
     }
 
     void SDL3AudioPlugin::SetPlaybackSpeed(const Audio& audio, float speed)
@@ -188,7 +174,7 @@ namespace Tbx::Plugins::SDL
         }
 
         it->second.Speed = speed;
-        ApplyStreamTuning(it->second);
+        ApplyStreamTuning(it->second, audio);
     }
 
     void SDL3AudioPlugin::SetLooping(const Audio& audio, bool loop)
@@ -233,7 +219,7 @@ namespace Tbx::Plugins::SDL
         }
 
         it->second.Volume = volume;
-        ApplyStreamTuning(it->second);
+        ApplyStreamTuning(it->second, audio);
     }
 
     bool SDL3AudioPlugin::CanLoad(const std::filesystem::path& filepath) const
@@ -282,7 +268,7 @@ namespace Tbx::Plugins::SDL
         return Audio(std::move(samples), format);
     }
 
-    void SDL3AudioPlugin::ApplyStreamTuning(PlaybackInstance& instance) const
+    void SDL3AudioPlugin::ApplyStreamTuning(PlaybackInstance& instance, const Audio& audio)
     {
         if (!instance.Stream)
         {
@@ -332,6 +318,19 @@ namespace Tbx::Plugins::SDL
         }
 
         return true;
+    }
+
+    void SDL3AudioPlugin::DestroyPlayback(PlaybackInstance& instance)
+    {
+        if (!instance.Stream)
+        {
+            return;
+        }
+
+        SDL_UnbindAudioStream(instance.Stream);
+        SDL_ClearAudioStream(instance.Stream);
+        SDL_DestroyAudioStream(instance.Stream);
+        instance.Stream = nullptr;
     }
 
     bool SDL3AudioPlugin::IsSupportedExtension(const std::filesystem::path& path)
