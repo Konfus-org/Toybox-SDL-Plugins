@@ -33,7 +33,7 @@ namespace Tbx::Plugins::SDLInput
         SDL_QuitSubSystem(SDL_INIT_SENSOR);
     }
 
-    void SDLInputHandlerPlugin::RefreshInputStates()
+    void SDLInputHandlerPlugin::UpdateInputState()
     {
         // Store previous states
         _prevKeyState = _currKeyState;
