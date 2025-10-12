@@ -1,6 +1,6 @@
 #include "SDLWindowFactoryPlugin.h"
 #include "SDLWindow.h"
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_init.h>
 
 namespace Tbx::Plugins::SDLWindowing
 {
@@ -15,7 +15,12 @@ namespace Tbx::Plugins::SDLWindowing
     SDLWindowFactoryPlugin::~SDLWindowFactoryPlugin()
     {
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
-        SDL_Quit(); // If we are unloading our windowing quit all of SDL
+
+        // Allow whichever plugin shuts down last to clean up SDL globally.
+        if (SDL_WasInit(0) == 0)
+        {
+            SDL_Quit();
+        }
     }
 
     std::shared_ptr<Window> SDLWindowFactoryPlugin::Create(const std::string& title, const Size& size, const WindowMode& mode, Ref<EventBus> eventBus)

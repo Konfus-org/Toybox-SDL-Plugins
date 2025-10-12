@@ -31,6 +31,12 @@ namespace Tbx::Plugins::SDLInput
         SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
         SDL_QuitSubSystem(SDL_INIT_HAPTIC);
         SDL_QuitSubSystem(SDL_INIT_SENSOR);
+
+        // Allow whichever plugin shuts down last to clean up SDL globally.
+        if (SDL_WasInit(0) == 0)
+        {
+            SDL_Quit();
+        }
     }
 
     void SDLInputHandlerPlugin::UpdateInputState()

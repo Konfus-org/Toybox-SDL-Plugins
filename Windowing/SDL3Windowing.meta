@@ -3,8 +3,5 @@
     "language": "C++",
     "version": "0.0.1",
     "author": "Konfus-dev",
-    "description": "Plugin to handle windowing via the SDL library.",
-    "dependencies" : [
-	"SDL3 OpenGl Graphics Context"
-    ]
+    "description": "Plugin to handle windowing via the SDL library."
 }
