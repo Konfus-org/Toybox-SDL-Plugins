@@ -6,33 +6,18 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace Tbx::Plugins::SDL3Audio
 {
-    // Extract a positional component from a Tbx::Vector3. SDL only needs the horizontal
-    // plane (X/Z) for panning plus the distance for attenuation, so the helper simply maps
-    // the fields into indexed access.
-    static float ExtractComponent(const Vector3& vector, size_t index)
-    {
-        switch (index)
-        {
-        case 0:
-            return static_cast<float>(vector.X);
-        case 1:
-            return static_cast<float>(vector.Y);
-        default:
-            return static_cast<float>(vector.Z);
-        }
-    }
-
     // Calculate stereo gains for a spatialized listener. Distance attenuates the overall
     // volume while the horizontal angle determines a simple left/right pan.
     static StereoSpace CalculateSpatialGains(const Vector3& position)
     {
-        const float x = ExtractComponent(position, 0);
-        const float y = ExtractComponent(position, 1);
-        const float z = ExtractComponent(position, 2);
+        const float x = static_cast<float>(position.X);
+        const float y = static_cast<float>(position.Y);
+        const float z = static_cast<float>(position.Z);
 
         // Use an inverse distance rolloff so sounds closer than the reference distance
         // remain at full volume and gradually attenuate as they move away.
@@ -56,6 +41,20 @@ namespace Tbx::Plugins::SDL3Audio
         space.Left = attenuation * std::sqrt(std::max(0.0f, 0.5f * (1.0f - pan)));
         space.Right = attenuation * std::sqrt(std::max(0.0f, 0.5f * (1.0f + pan)));
         return space;
+    }
+
+    static PlaybackParams BuildParamsFromInstance(const PlaybackInstance& instance)
+    {
+        PlaybackParams params = {};
+        params.Volume = instance.Volume;
+        params.Pitch = instance.Pitch;
+        params.Speed = instance.Speed;
+        params.Looping = instance.Loop;
+        if (instance.Spatial)
+        {
+            params.Stereo = instance.SpatialGain;
+        }
+        return params;
     }
 
     SDL3AudioPlugin::SDL3AudioPlugin(Ref<EventBus> eventBus)
@@ -112,22 +111,25 @@ namespace Tbx::Plugins::SDL3Audio
 
     void SDL3AudioPlugin::Play(const Audio& audio)
     {
-        BeginPlayback(audio, nullptr);
+        StartPlayback(audio, ResolveSpatialSettings(audio));
     }
 
-    void SDL3AudioPlugin::PlayFromPosition(const Audio& audio, const Vector3& position)
+    void SDL3AudioPlugin::SetPosition(const Audio& audio, const Vector3& position)
     {
-        BeginPlayback(audio, &position);
+        StartPlayback(audio, ResolveSpatialSettings(audio, position));
     }
 
-    SpatialSettings SDL3AudioPlugin::ResolveSpatialSettings(const Audio& audio, const Vector3* position) const
+    SpatialSettings SDL3AudioPlugin::ResolveSpatialSettings(const Audio& audio) const
     {
         SpatialSettings settings = {};
-        settings.Requested = position != nullptr;
-        if (!settings.Requested)
-        {
-            return settings;
-        }
+        settings.Requested = false;
+        return settings;
+    }
+
+    SpatialSettings SDL3AudioPlugin::ResolveSpatialSettings(const Audio& audio, const Vector3& position) const
+    {
+        SpatialSettings settings = {};
+        settings.Requested = true;
 
         // Spatial playback relies on float samples so we can mix them directly into stereo output.
         const bool formatSupportsSpatial = audio.Format.SampleFormat == AudioSampleFormat::Float32 && audio.Format.Channels > 0;
@@ -146,133 +148,196 @@ namespace Tbx::Plugins::SDL3Audio
 
         // Pre-calculate the gains so any subsequently queued buffers reuse the same spatial values.
         settings.Enabled = true;
-        settings.Gain = CalculateSpatialGains(*position);
+        settings.Gain = CalculateSpatialGains(position);
         return settings;
     }
 
-    PlaybackReuseResult SDL3AudioPlugin::ReusePlaybackInstance(const Audio& audio, const SpatialSettings& settings)
+    PlaybackInstance* SDL3AudioPlugin::GetOrCreatePlayback(const Audio& audio, const SpatialSettings* spatial, bool createIfMissing)
     {
         auto it = _playbackInstances.find(audio.Id);
-        if (it == _playbackInstances.end())
+        if (it != _playbackInstances.end())
         {
-            return PlaybackReuseResult::None;
+            PlaybackInstance& instance = it->second;
+            if (spatial != nullptr)
+            {
+                const bool layoutMismatch = instance.Stream != nullptr && instance.Spatial != spatial->Enabled;
+                if (layoutMismatch)
+                {
+                    DestroyPlayback(instance);
+                }
+
+                instance.Spatial = spatial->Enabled;
+                if (layoutMismatch || instance.Stream == nullptr)
+                {
+                    instance.SpatialGain = instance.Spatial ? spatial->Gain : StereoSpace{};
+                    if (!BuildPlaybackStream(instance, audio, *spatial))
+                    {
+                        RemovePlayback(audio, instance);
+                        return nullptr;
+                    }
+                }
+            }
+
+            if (instance.Stream == nullptr)
+            {
+                SpatialSettings resolved = spatial ? *spatial : ResolveSpatialSettings(audio);
+                instance.Spatial = resolved.Enabled;
+                instance.SpatialGain = instance.Spatial ? resolved.Gain : StereoSpace{};
+                if (!BuildPlaybackStream(instance, audio, resolved))
+                {
+                    RemovePlayback(audio, instance);
+                    return nullptr;
+                }
+            }
+            return &instance;
         }
 
-        auto& instance = it->second;
-        if (instance.Stream && instance.Spatial != settings.Enabled)
+        if (!createIfMissing)
         {
-            // Rebuild the stream if the caller toggled spatial playback so we do not accidentally feed positional data into a mismatched stream layout.
+            return nullptr;
+        }
+
+        SpatialSettings resolved = spatial ? *spatial : ResolveSpatialSettings(audio);
+        PlaybackInstance instance = {};
+        instance.Spatial = resolved.Enabled;
+        instance.SpatialGain = instance.Spatial ? resolved.Gain : StereoSpace{};
+
+        if (!BuildPlaybackStream(instance, audio, resolved))
+        {
+            return nullptr;
+        }
+
+        auto [iter, inserted] = _playbackInstances.try_emplace(audio.Id, std::move(instance));
+        if (!inserted)
+        {
             DestroyPlayback(instance);
-            _playbackInstances.erase(it);
-            return PlaybackReuseResult::None;
+            return &iter->second;
         }
 
-        // Existing streams can continue playback once we update their spatial bookkeeping.
-        instance.IsPlaying = true;
-        instance.Spatial = settings.Enabled;
-        instance.SpatialGain = settings.Enabled ? settings.Gain : StereoSpace{};
-
-        if (!instance.Stream || !instance.Loop)
-        {
-            return PlaybackReuseResult::Reused;
-        }
-
-        const int queued = SDL_GetAudioStreamQueued(instance.Stream);
-        if (queued < 0)
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Failed to query queued audio for asset {}: {}", audio.Id.ToString(), SDL_GetError());
-            return PlaybackReuseResult::Reused;
-        }
-
-        if (queued > 0)
-        {
-            return PlaybackReuseResult::Reused;
-        }
-
-        if (QueueAudioData(instance, audio))
-        {
-            return PlaybackReuseResult::Reused;
-        }
-
-        // Queueing failures stop playback entirely so we do not leave a corrupted instance behind.
-        TBX_TRACE_ERROR("SDL3Audio: Failed to queue looped audio for asset {}.", audio.Id.ToString());
-        DestroyPlayback(instance);
-        _playbackInstances.erase(it);
-        return PlaybackReuseResult::Abort;
+        return &iter->second;
     }
 
-    bool SDL3AudioPlugin::PrepareSourceSpec(SDL_AudioSpec& sourceSpec, const Audio& audio, const SpatialSettings& settings) const
+    bool SDL3AudioPlugin::BuildPlaybackStream(PlaybackInstance& instance, const Audio& audio, const SpatialSettings& settings)
     {
-        sourceSpec = ConvertFormatToSpec(audio.Format);
+        DestroyPlayback(instance);
+
+        if (audio.Format.SampleFormat == AudioSampleFormat::Unknown || audio.Data.empty())
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Audio asset {} contains no playable data.", audio.Id.ToString());
+            return false;
+        }
+
+        SDL_AudioSpec sourceSpec = ConvertFormatToSpec(audio.Format);
         if (sourceSpec.format == 0)
         {
+            TBX_TRACE_WARNING("SDL3Audio: Unsupported audio sample format for asset {}.", audio.Id.ToString());
             return false;
         }
 
         if (settings.Enabled)
         {
-            // Force float stereo output from the asset so we can pan and attenuate before SDL converts to the device format.
             sourceSpec.format = SDL_AUDIO_F32;
             sourceSpec.channels = 2;
-        }
-
-        return true;
-    }
-
-    void SDL3AudioPlugin::BeginPlayback(const Audio& audio, const Vector3* position)
-    {
-        const SpatialSettings spatial = ResolveSpatialSettings(audio, position);
-        switch (ReusePlaybackInstance(audio, spatial))
-        {
-        case PlaybackReuseResult::Reused:
-        case PlaybackReuseResult::Abort:
-            return;
-        case PlaybackReuseResult::None:
-            break;
-        }
-
-        const auto& format = audio.Format;
-        if (format.SampleFormat == AudioSampleFormat::Unknown || audio.Data.empty())
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Audio asset {} contains no playable data.", audio.Id.ToString());
-            return;
-        }
-
-        SDL_AudioSpec sourceSpec = {};
-        if (!PrepareSourceSpec(sourceSpec, audio, spatial))
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Unsupported audio sample format for asset {}.", audio.Id.ToString());
-            return;
         }
 
         SDL_AudioStream* stream = SDL_CreateAudioStream(&sourceSpec, &_deviceSpec);
         if (stream == nullptr)
         {
             TBX_TRACE_ERROR("SDL3Audio: Failed to create audio stream: {}", SDL_GetError());
-            return;
+            return false;
         }
 
         if (!SDL_BindAudioStream(_device, stream))
         {
             TBX_TRACE_ERROR("SDL3Audio: Failed to bind audio stream: {}", SDL_GetError());
             SDL_DestroyAudioStream(stream);
-            return;
+            return false;
         }
 
-        PlaybackInstance instance = {};
         instance.Stream = stream;
-        instance.Spatial = spatial.Enabled;
-        instance.IsPlaying = true;
-        instance.SpatialGain = spatial.Enabled ? spatial.Gain : StereoSpace{};
-
-        if (!QueueAudioData(instance, audio))
+        if (!SubmitAudioData(instance, audio, true))
         {
             SDL_UnbindAudioStream(stream);
             SDL_DestroyAudioStream(stream);
-            return;
+            instance.Stream = nullptr;
+            return false;
         }
 
-        _playbackInstances.emplace(audio.Id, instance);
+        return true;
+    }
+
+    bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)
+    {
+        if (!instance.Stream)
+        {
+            return false;
+        }
+
+        const bool wasLooping = instance.Loop;
+        const StereoSpace previousSpace = instance.SpatialGain;
+
+        instance.Volume = params.Volume;
+        instance.Pitch = params.Pitch;
+        instance.Speed = params.Speed;
+        instance.Loop = params.Looping;
+
+        if (instance.Spatial)
+        {
+            instance.SpatialGain = params.Stereo;
+        }
+        else
+        {
+            instance.SpatialGain = StereoSpace{};
+        }
+
+        const float ratio = std::clamp(instance.Pitch * instance.Speed, 0.01f, 100.0f);
+        if (!SDL_SetAudioStreamFrequencyRatio(instance.Stream, ratio))
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream playback ratio: {}", SDL_GetError());
+        }
+
+        if (!SDL_SetAudioStreamGain(instance.Stream, instance.Volume))
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream volume: {}", SDL_GetError());
+        }
+
+        if (!instance.IsPlaying)
+        {
+            return true;
+        }
+
+        const bool spatialChanged = instance.Spatial && (previousSpace.Left != instance.SpatialGain.Left || previousSpace.Right != instance.SpatialGain.Right);
+        if (spatialChanged)
+        {
+            if (!SubmitAudioData(instance, audio, true))
+            {
+                return false;
+            }
+
+            if (instance.Loop)
+            {
+                return SubmitAudioData(instance, audio, false);
+            }
+
+            return true;
+        }
+
+        if (instance.Loop)
+        {
+            const int queued = SDL_GetAudioStreamQueued(instance.Stream);
+            if (queued < 0)
+            {
+                TBX_TRACE_WARNING("SDL3Audio: Failed to query queued audio for asset {}: {}", audio.Id.ToString(), SDL_GetError());
+                return true;
+            }
+
+            if (queued == 0 || !wasLooping)
+            {
+                return SubmitAudioData(instance, audio, false);
+            }
+        }
+
+        return true;
     }
 
     void SDL3AudioPlugin::Stop(const Audio& audio)
@@ -284,77 +349,75 @@ namespace Tbx::Plugins::SDL3Audio
         }
 
         it->second.IsPlaying = false;
-        DestroyPlayback(it->second);
-        _playbackInstances.erase(it);
+        RemovePlayback(audio, it->second);
     }
 
     void SDL3AudioPlugin::SetPitch(const Audio& audio, float pitch)
     {
-        auto it = _playbackInstances.find(audio.Id);
-        if (it == _playbackInstances.end())
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
         {
             return;
         }
 
-        it->second.Pitch = pitch;
-        ApplyStreamTuning(it->second, audio);
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Pitch = pitch;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
     }
 
     void SDL3AudioPlugin::SetPlaybackSpeed(const Audio& audio, float speed)
     {
-        auto it = _playbackInstances.find(audio.Id);
-        if (it == _playbackInstances.end())
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
         {
             return;
         }
 
-        it->second.Speed = speed;
-        ApplyStreamTuning(it->second, audio);
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Speed = speed;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
     }
 
     void SDL3AudioPlugin::SetLooping(const Audio& audio, bool loop)
     {
-        auto it = _playbackInstances.find(audio.Id);
-        if (it == _playbackInstances.end())
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
         {
             return;
         }
 
-        auto& instance = it->second;
-        instance.Loop = loop;
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Looping = loop;
 
-        if (!instance.Stream || !instance.Loop)
+        if (!SetPlaybackParams(*instance, audio, params))
         {
-            return;
-        }
-
-        const int queued = SDL_GetAudioStreamQueued(instance.Stream);
-        if (queued == 0)
-        {
-            if (!QueueAudioData(instance, audio))
-            {
-                TBX_TRACE_ERROR("SDL3Audio: Failed to queue looped audio for asset {}.", audio.Id.ToString());
-                DestroyPlayback(instance);
-                _playbackInstances.erase(it);
-                return;
-            }
-        }
-        else if (queued < 0)
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Failed to query queued audio for asset {}: {}", audio.Id.ToString(), SDL_GetError());
+            RemovePlayback(audio, *instance);
         }
     }
 
     void SDL3AudioPlugin::SetVolume(const Audio& audio, float volume)
     {
-        auto it = _playbackInstances.find(audio.Id);
-        if (it == _playbackInstances.end())
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
         {
             return;
         }
 
-        it->second.Volume = volume;
-        ApplyStreamTuning(it->second, audio);
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Volume = volume;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
     }
 
     bool SDL3AudioPlugin::CanLoad(const std::filesystem::path& filepath) const
@@ -403,30 +466,19 @@ namespace Tbx::Plugins::SDL3Audio
         return Audio(std::move(samples), format);
     }
 
-    void SDL3AudioPlugin::ApplyStreamTuning(PlaybackInstance& instance, const Audio& audio)
-    {
-        if (!instance.Stream)
-        {
-            return;
-        }
-
-        const float ratio = std::clamp(instance.Pitch * instance.Speed, 0.01f, 100.0f);
-        if (!SDL_SetAudioStreamFrequencyRatio(instance.Stream, ratio))
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream playback ratio: {}", SDL_GetError());
-        }
-
-        if (!SDL_SetAudioStreamGain(instance.Stream, instance.Volume))
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream volume: {}", SDL_GetError());
-        }
-    }
-
-    bool SDL3AudioPlugin::QueueAudioData(PlaybackInstance& instance, const Audio& audio)
+    bool SDL3AudioPlugin::SubmitAudioData(PlaybackInstance& instance, const Audio& audio, bool resetStream)
     {
         if (!instance.Stream || audio.Data.empty())
         {
             return false;
+        }
+
+        if (resetStream)
+        {
+            if (!SDL_ClearAudioStream(instance.Stream))
+            {
+                TBX_TRACE_WARNING("SDL3Audio: Failed to clear audio stream: {}", SDL_GetError());
+            }
         }
 
         const auto queueRaw = [&](const void* buffer, size_t size) -> bool
@@ -465,8 +517,6 @@ namespace Tbx::Plugins::SDL3Audio
             return false;
         }
 
-        // Mix the source channels into a mono signal, then apply stereo gains so we can
-        // approximate a 3D position with simple panning and distance attenuation.
         if (dataSize % sizeof(float) != 0)
         {
             TBX_TRACE_ERROR("SDL3Audio: Unexpected audio buffer size for asset {}.", audio.Id.ToString());
@@ -494,7 +544,7 @@ namespace Tbx::Plugins::SDL3Audio
             const size_t baseIndex = frame * static_cast<size_t>(channels);
             for (int channel = 0; channel < channels; ++channel)
             {
-                // Average all channels to produce a single sample before applying
+                // Average all channels to produce a single mono sample before applying
                 // positional gain to each ear.
                 monoSample += samples[baseIndex + static_cast<size_t>(channel)];
             }
@@ -504,6 +554,33 @@ namespace Tbx::Plugins::SDL3Audio
         }
 
         return queueRaw(processed.data(), processed.size() * sizeof(float));
+    }
+
+    void SDL3AudioPlugin::StartPlayback(const Audio& audio, const SpatialSettings& spatial)
+    {
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, &spatial, true);
+        if (instance == nullptr)
+        {
+            return;
+        }
+
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        if (spatial.Enabled)
+        {
+            params.Stereo = spatial.Gain;
+        }
+
+        instance->IsPlaying = true;
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
+    }
+
+    void SDL3AudioPlugin::RemovePlayback(const Audio& audio, PlaybackInstance& instance)
+    {
+        DestroyPlayback(instance);
+        _playbackInstances.erase(audio.Id);
     }
 
     void SDL3AudioPlugin::DestroyPlayback(PlaybackInstance& instance)
