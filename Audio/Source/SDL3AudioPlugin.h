@@ -51,7 +51,7 @@ namespace Tbx::Plugins::SDL3Audio
 
         // IAudioMixer
         void Play(const Audio& audio) override;
-        void PlayFromPosition(const Audio& audio, Vector3 position) override;
+        void PlayFromPosition(const Audio& audio, const Vector3& position) override;
         void Stop(const Audio& audio) override;
         void SetPitch(const Audio& audio, float pitch) override;
         void SetPlaybackSpeed(const Audio& audio, float speed) override;

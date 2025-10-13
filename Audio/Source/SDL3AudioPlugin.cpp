@@ -115,7 +115,7 @@ namespace Tbx::Plugins::SDL3Audio
         BeginPlayback(audio, nullptr);
     }
 
-    void SDL3AudioPlugin::PlayFromPosition(const Audio& audio, Vector3 position)
+    void SDL3AudioPlugin::PlayFromPosition(const Audio& audio, const Vector3& position)
     {
         BeginPlayback(audio, &position);
     }
