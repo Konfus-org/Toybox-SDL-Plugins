@@ -255,6 +255,18 @@ namespace Tbx::Plugins::SDL3Audio
         }
 
         instance.Stream = stream;
+        if (settings.Enabled)
+        {
+            if (!ConfigureChannelMap(instance, settings.Gain))
+            {
+                TBX_TRACE_ERROR("SDL3Audio: Failed to configure spatial channel map: {}", SDL_GetError());
+                SDL_UnbindAudioStream(stream);
+                SDL_DestroyAudioStream(stream);
+                instance.Stream = nullptr;
+                return false;
+            }
+        }
+
         if (!SubmitAudioData(instance, audio, true))
         {
             SDL_UnbindAudioStream(stream);
@@ -264,6 +276,36 @@ namespace Tbx::Plugins::SDL3Audio
         }
 
         return true;
+    }
+
+    bool SDL3AudioPlugin::ConfigureChannelMap(PlaybackInstance& instance, const StereoSpace& stereo)
+    {
+        if (!instance.Stream)
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Unsupported audio sample format for asset {}.", audio.Id.ToString());
+            return false;
+        }
+
+        const int outputChannels = static_cast<int>(_deviceSpec.channels);
+        if (outputChannels < 2)
+        {
+            return false;
+        }
+
+        const int inputChannels = 2;
+        std::vector<float> channelMap(static_cast<size_t>(outputChannels) * static_cast<size_t>(inputChannels), 0.0f);
+        const auto index = [inputChannels](int destination, int source) -> size_t
+        {
+            return static_cast<size_t>(destination) * static_cast<size_t>(inputChannels) + static_cast<size_t>(source);
+        };
+
+        channelMap[index(0, 0)] = stereo.Left;
+        if (outputChannels >= 2)
+        {
+            channelMap[index(1, 1)] = stereo.Right;
+        }
+
+        return SDL_AudioStreamSetChannelMap(instance.Stream, channelMap.data(), inputChannels, outputChannels);
     }
 
     bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)
@@ -309,17 +351,10 @@ namespace Tbx::Plugins::SDL3Audio
         const bool spatialChanged = instance.Spatial && (previousSpace.Left != instance.SpatialGain.Left || previousSpace.Right != instance.SpatialGain.Right);
         if (spatialChanged)
         {
-            if (!SubmitAudioData(instance, audio, true))
+            if (!ConfigureChannelMap(instance, instance.SpatialGain))
             {
-                return false;
+                TBX_TRACE_WARNING("SDL3Audio: Unable to refresh spatial channel map: {}", SDL_GetError());
             }
-
-            if (instance.Loop)
-            {
-                return SubmitAudioData(instance, audio, false);
-            }
-
-            return true;
         }
 
         if (instance.Loop)
@@ -533,8 +568,6 @@ namespace Tbx::Plugins::SDL3Audio
 
         const size_t frameCount = sampleCount / static_cast<size_t>(channels);
         std::vector<float> processed(frameCount * 2);
-        const float leftGain = instance.SpatialGain.Left;
-        const float rightGain = instance.SpatialGain.Right;
         const float invChannelCount = 1.0f / static_cast<float>(channels);
         const float* samples = reinterpret_cast<const float*>(audio.Data.data());
 
@@ -544,13 +577,13 @@ namespace Tbx::Plugins::SDL3Audio
             const size_t baseIndex = frame * static_cast<size_t>(channels);
             for (int channel = 0; channel < channels; ++channel)
             {
-                // Average all channels to produce a single mono sample before applying
-                // positional gain to each ear.
+                // Average all channels to produce a single mono sample before handing it
+                // to the channel map for stereo distribution.
                 monoSample += samples[baseIndex + static_cast<size_t>(channel)];
             }
             monoSample *= invChannelCount;
-            processed[frame * 2] = monoSample * leftGain;
-            processed[frame * 2 + 1] = monoSample * rightGain;
+            processed[frame * 2] = monoSample;
+            processed[frame * 2 + 1] = monoSample;
         }
 
         return queueRaw(processed.data(), processed.size() * sizeof(float));

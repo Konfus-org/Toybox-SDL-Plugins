@@ -70,6 +70,7 @@ namespace Tbx::Plugins::SDL3Audio
         bool SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params);
         PlaybackInstance* GetOrCreatePlayback(const Audio& audio, const SpatialSettings* spatial, bool createIfMissing);
         bool BuildPlaybackStream(PlaybackInstance& instance, const Audio& audio, const SpatialSettings& settings);
+        bool ConfigureChannelMap(PlaybackInstance& instance, const StereoSpace& stereo);
         bool SubmitAudioData(PlaybackInstance& instance, const Audio& audio, bool resetStream);
         void StartPlayback(const Audio& audio, const SpatialSettings& spatial);
         void RemovePlayback(const Audio& audio, PlaybackInstance& instance);
