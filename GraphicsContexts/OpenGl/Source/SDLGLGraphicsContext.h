@@ -1,5 +1,5 @@
 #pragma once
-#include <Tbx/Graphics/GraphicsContext.h>
+#include "Tbx/Graphics/GraphicsContext.h"
 #include <SDL3/SDL_video.h>
 
 namespace Tbx::Plugins::SDLGraphicsContext

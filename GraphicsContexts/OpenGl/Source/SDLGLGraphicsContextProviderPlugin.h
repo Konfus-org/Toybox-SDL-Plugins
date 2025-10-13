@@ -1,7 +1,7 @@
 #pragma 
-#include <Tbx/Plugins/Plugin.h>
-#include <Tbx/Graphics/GraphicsContext.h>
-#include <Tbx/Windowing/Window.h>
+#include "Tbx/Plugins/Plugin.h"
+#include "Tbx/Graphics/GraphicsContext.h"
+#include "Tbx/Windowing/Window.h"
 
 namespace Tbx::Plugins::SDLGraphicsContext
 {

@@ -1,6 +1,7 @@
 #include "SDLInputHandlerPlugin.h"
 #include "SDLTbxInputCodeConverters.h"
-#include <Tbx/Debug/Tracers.h>
+#include "Tbx/Debug/Asserts.h"
+#include "Tbx/Debug/Tracers.h"
 #include <cstring>
 
 namespace Tbx::Plugins::SDLInput

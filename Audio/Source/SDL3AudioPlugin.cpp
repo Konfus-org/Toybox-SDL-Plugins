@@ -8,7 +8,7 @@
 #include <string>
 #include <utility>
 
-namespace Tbx::Plugins::SDL
+namespace Tbx::Plugins::SDL3Audio
 {
     static std::string ToLowerCopy(std::string value)
     {

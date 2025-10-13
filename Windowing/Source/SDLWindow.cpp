@@ -1,12 +1,12 @@
 #include "SDLWindow.h"
-#include <Tbx/Events/WindowEvents.h>
-#include <Tbx/Debug/Asserts.h>
-#include <SDL3/SDL.h>
+#include "Tbx/Debug/Asserts.h"
+#include "Tbx/Events/WindowEvents.h"
+#include <SDL3/SDL_events.h>
 
 namespace Tbx::Plugins::SDLWindowing
 {
     SDLWindow::SDLWindow(bool useOpenGl, Ref<EventBus> eventBus)
-        :  _eventBus(eventBus), _useOpenGl(useOpenGl)
+        : _eventCarrier(eventBus), _useOpenGl(useOpenGl)
     {
     }
 
@@ -43,24 +43,24 @@ namespace Tbx::Plugins::SDLWindowing
         switch (_currentMode)
         {
             using enum WindowMode;
-            case Windowed:   break;
-            case Fullscreen: flags |= SDL_WINDOW_FULLSCREEN; break;
-            case Borderless: flags |= SDL_WINDOW_BORDERLESS; break;
-            case FullscreenBorderless: 
-            {
-                flags |= SDL_WINDOW_FULLSCREEN;
-                flags |= SDL_WINDOW_BORDERLESS;
-                break;
-            }
-            default:
-            {
-                TBX_ASSERT(false, "Invalid window mode");
-            }
+        case Windowed:   break;
+        case Fullscreen: flags |= SDL_WINDOW_FULLSCREEN; break;
+        case Borderless: flags |= SDL_WINDOW_BORDERLESS; break;
+        case FullscreenBorderless:
+        {
+            flags |= SDL_WINDOW_FULLSCREEN;
+            flags |= SDL_WINDOW_BORDERLESS;
+            break;
+        }
+        default:
+        {
+            TBX_ASSERT(false, "Invalid window mode");
+        }
         }
 
         _window = SDL_CreateWindow(_title.c_str(), _size.Width, _size.Height, flags);
         TBX_ASSERT(_window, "SDLWindow: SDL_CreateWindow failed: %s", SDL_GetError());
-        _eventBus->Post(WindowOpenedEvent(_this.lock()));
+        _eventCarrier.Post(WindowOpenedEvent(_this.lock()));
     }
 
     void SDLWindow::Close()
@@ -79,7 +79,7 @@ namespace Tbx::Plugins::SDLWindowing
             SDL_GL_DestroyContext(_glContext);
         }
 
-        _eventBus->Post(WindowClosedEvent(_this.lock()));
+        _eventCarrier.Post(WindowClosedEvent(_this.lock()));
     }
 
     void SDLWindow::Update()
@@ -88,47 +88,47 @@ namespace Tbx::Plugins::SDLWindowing
         SDL_PollEvent(&e);
         switch (e.type)
         {
-            case SDL_EVENT_QUIT:
+        case SDL_EVENT_QUIT:
+        {
+            Close();
+            break;
+        }
+        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+        {
+            if (e.window.windowID == SDL_GetWindowID(_window))
             {
-                Close();
-                break;
+                int w, h;
+                SDL_GetWindowSize(_window, &w, &h);
+                SetSize(Size(w, h));
+                SetMode(WindowMode::Fullscreen);
             }
-            case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+            break;
+        }
+        case SDL_EVENT_WINDOW_RESIZED:
+        {
+            if (e.window.windowID == SDL_GetWindowID(_window))
             {
-                if (e.window.windowID == SDL_GetWindowID(_window))
-                {
-                    int w, h;
-                    SDL_GetWindowSize(_window, &w, &h);
-                    SetSize(Size(w, h));
-                    SetMode(WindowMode::Fullscreen);
-                }
-                break;
+                int w, h;
+                SDL_GetWindowSize(_window, &w, &h);
+                SetSize(Size(w, h));
             }
-            case SDL_EVENT_WINDOW_RESIZED:
+            break;
+        }
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        {
+            if (e.window.windowID == SDL_GetWindowID(_window))
             {
-                if (e.window.windowID == SDL_GetWindowID(_window))
-                {
-                    int w, h;
-                    SDL_GetWindowSize(_window, &w, &h);
-                    SetSize(Size(w, h));
-                }
-                break;
+                Focus();
             }
-            case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            break;
+        }
+        case SDL_EVENT_WINDOW_FOCUS_LOST:
+        {
+            if (e.window.windowID == SDL_GetWindowID(_window))
             {
-                if (e.window.windowID ==  SDL_GetWindowID(_window))
-                {
-                    Focus();
-                }
-                break;
+                _isFocused = false;
             }
-            case SDL_EVENT_WINDOW_FOCUS_LOST:
-            {
-                if (e.window.windowID == SDL_GetWindowID(_window))
-                {
-                    _isFocused = false;
-                }
-            }
+        }
         }
 
         if (_useOpenGl)
@@ -145,7 +145,7 @@ namespace Tbx::Plugins::SDLWindowing
         {
             SDL_GL_MakeCurrent(_window, _glContext);
         }
-        _eventBus->Post(WindowFocusedEvent(_this.lock()));
+        _eventCarrier.Post(WindowFocusedEvent(_this.lock()));
     }
 
     bool SDLWindow::IsClosed()
@@ -190,7 +190,7 @@ namespace Tbx::Plugins::SDLWindowing
         }
 
         SDL_SetWindowSize(_window, _size.Width, _size.Height);
-        _eventBus->Post(WindowResizedEvent(_this.lock()));
+        _eventCarrier.Post(WindowResizedEvent(_this.lock()));
     }
 
     void SDLWindow::SetMode(const WindowMode& mode)
@@ -204,29 +204,29 @@ namespace Tbx::Plugins::SDLWindowing
         switch (_currentMode)
         {
             using enum WindowMode;
-            case Windowed:
-            {
-                SDL_SetWindowFullscreen(_window, false);
-                SDL_SetWindowBordered(_window, true);
-                break;
-            }
-            case Fullscreen:
-            {
-                SDL_SetWindowFullscreen(_window, true);
-                break;
-            }
-            case Borderless:
-            {
-                SDL_SetWindowFullscreen(_window, false);
-                SDL_SetWindowBordered(_window, false);
-                break;
-            }
-            case FullscreenBorderless:
-            {
-                SDL_SetWindowFullscreen(_window, true);
-                SDL_SetWindowBordered(_window, false);
-                break;
-            }
+        case Windowed:
+        {
+            SDL_SetWindowFullscreen(_window, false);
+            SDL_SetWindowBordered(_window, true);
+            break;
+        }
+        case Fullscreen:
+        {
+            SDL_SetWindowFullscreen(_window, true);
+            break;
+        }
+        case Borderless:
+        {
+            SDL_SetWindowFullscreen(_window, false);
+            SDL_SetWindowBordered(_window, false);
+            break;
+        }
+        case FullscreenBorderless:
+        {
+            SDL_SetWindowFullscreen(_window, true);
+            SDL_SetWindowBordered(_window, false);
+            break;
+        }
         }
     }
 
