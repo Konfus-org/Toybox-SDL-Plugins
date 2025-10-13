@@ -114,9 +114,220 @@ namespace Tbx::Plugins::SDL3Audio
         StartPlayback(audio, ResolveSpatialSettings(audio));
     }
 
+    void SDL3AudioPlugin::Stop(const Audio& audio)
+    {
+        auto it = _playbackInstances.find(audio.Id);
+        if (it == _playbackInstances.end())
+        {
+            return;
+        }
+
+        it->second.IsPlaying = false;
+        RemovePlayback(audio, it->second);
+    }
+
     void SDL3AudioPlugin::SetPosition(const Audio& audio, const Vector3& position)
     {
-        StartPlayback(audio, ResolveSpatialSettings(audio, position));
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
+        {
+            return;
+        }
+
+        auto spacialSettings = ResolveSpatialSettings(audio, position);
+        if (spacialSettings.Enabled)
+        {
+            PlaybackParams params = BuildParamsFromInstance(*instance);
+            if (!SetPlaybackParams(*instance, audio, params))
+            {
+                RemovePlayback(audio, *instance);
+            }
+        }
+        else
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Spatial playback requested for asset {} but it could not be set. Is the audio device stereo?", audio.Id.ToString());
+        }
+    }
+
+    void SDL3AudioPlugin::SetPitch(const Audio& audio, float pitch)
+    {
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
+        {
+            return;
+        }
+
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Pitch = pitch;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
+    }
+
+    void SDL3AudioPlugin::SetPlaybackSpeed(const Audio& audio, float speed)
+    {
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
+        {
+            return;
+        }
+
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Speed = speed;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
+    }
+
+    void SDL3AudioPlugin::SetLooping(const Audio& audio, bool loop)
+    {
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
+        {
+            return;
+        }
+
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Looping = loop;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
+    }
+
+    void SDL3AudioPlugin::SetVolume(const Audio& audio, float volume)
+    {
+        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
+        if (instance == nullptr)
+        {
+            return;
+        }
+
+        PlaybackParams params = BuildParamsFromInstance(*instance);
+        params.Volume = volume;
+
+        if (!SetPlaybackParams(*instance, audio, params))
+        {
+            RemovePlayback(audio, *instance);
+        }
+    }
+
+    bool SDL3AudioPlugin::CanLoad(const std::filesystem::path& filepath) const
+    {
+        return IsSupportedExtension(filepath);
+    }
+
+    Audio SDL3AudioPlugin::LoadAudio(const std::filesystem::path& filepath)
+    {
+        SDL_AudioSpec sourceSpec = {};
+        Uint8* rawBuffer = nullptr;
+        Uint32 rawLength = 0;
+
+        if (filepath.extension() == ".wav" || filepath.extension() == ".wave")
+        {
+            if (!SDL_LoadWAV(filepath.string().c_str(), &sourceSpec, &rawBuffer, &rawLength))
+            {
+                TBX_TRACE_ERROR("SDL3Audio: Failed to load '{}': {}", filepath.string(), SDL_GetError());
+                return Audio();
+            }
+        }
+        else
+        {
+            TBX_ASSERT(false, "SDL3Audio: Unsupported audio file format.");
+            return Audio();
+        }
+
+        SDL_AudioSpec targetSpec = sourceSpec;
+        targetSpec.format = SDL_AUDIO_F32;
+
+        Uint8* convertedBuffer = nullptr;
+        int convertedLength = 0;
+        bool converted = SDL_ConvertAudioSamples(&sourceSpec, rawBuffer, static_cast<int>(rawLength), &targetSpec, &convertedBuffer, &convertedLength);
+        SDL_free(rawBuffer);
+
+        if (!converted)
+        {
+            TBX_TRACE_ERROR("SDL3Audio: Failed to convert audio '{}': {}", filepath.string(), SDL_GetError());
+            return Audio();
+        }
+
+        AudioFormat format = ConvertSpecToFormat(targetSpec);
+        Audio::SampleData samples(convertedBuffer, convertedBuffer + convertedLength);
+        SDL_free(convertedBuffer);
+
+        return Audio(std::move(samples), format);
+    }
+
+    bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)
+    {
+        if (!instance.Stream)
+        {
+            return false;
+        }
+
+        const bool wasLooping = instance.Loop;
+        const StereoSpace previousSpace = instance.SpatialGain;
+
+        instance.Volume = params.Volume;
+        instance.Pitch = params.Pitch;
+        instance.Speed = params.Speed;
+        instance.Loop = params.Looping;
+
+        if (instance.Spatial)
+        {
+            instance.SpatialGain = params.Stereo;
+        }
+        else
+        {
+            instance.SpatialGain = StereoSpace{};
+        }
+
+        const float ratio = std::clamp(instance.Pitch * instance.Speed, 0.01f, 100.0f);
+        if (!SDL_SetAudioStreamFrequencyRatio(instance.Stream, ratio))
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream playback ratio: {}", SDL_GetError());
+        }
+
+        if (!SDL_SetAudioStreamGain(instance.Stream, instance.Volume))
+        {
+            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream volume: {}", SDL_GetError());
+        }
+
+        if (!instance.IsPlaying)
+        {
+            return true;
+        }
+
+        const bool spatialChanged = instance.Spatial && (previousSpace.Left != instance.SpatialGain.Left || previousSpace.Right != instance.SpatialGain.Right);
+        if (spatialChanged)
+        {
+            if (!ConfigureChannelMap(instance, instance.SpatialGain))
+            {
+                TBX_TRACE_WARNING("SDL3Audio: Unable to refresh spatial channel map: {}", SDL_GetError());
+            }
+        }
+
+        if (instance.Loop)
+        {
+            const int queued = SDL_GetAudioStreamQueued(instance.Stream);
+            if (queued < 0)
+            {
+                TBX_TRACE_WARNING("SDL3Audio: Failed to query queued audio for asset {}: {}", audio.Id.ToString(), SDL_GetError());
+                return true;
+            }
+
+            if (queued == 0 || !wasLooping)
+            {
+                return SubmitAudioData(instance, audio, false);
+            }
+        }
+
+        return true;
     }
 
     SpatialSettings SDL3AudioPlugin::ResolveSpatialSettings(const Audio& audio) const
@@ -280,225 +491,27 @@ namespace Tbx::Plugins::SDL3Audio
 
     bool SDL3AudioPlugin::ConfigureChannelMap(PlaybackInstance& instance, const StereoSpace& stereo)
     {
-        if (!instance.Stream)
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Unsupported audio sample format for asset {}.", audio.Id.ToString());
-            return false;
-        }
-
-        const int outputChannels = static_cast<int>(_deviceSpec.channels);
+        /*const int outputChannels = static_cast<int>(_deviceSpec.channels);
         if (outputChannels < 2)
         {
             return false;
         }
 
         const int inputChannels = 2;
-        std::vector<float> channelMap(static_cast<size_t>(outputChannels) * static_cast<size_t>(inputChannels), 0.0f);
+        std::vector<int> channelMap(static_cast<size_t>(outputChannels) * static_cast<size_t>(inputChannels), 0.0f);
         const auto index = [inputChannels](int destination, int source) -> size_t
-        {
-            return static_cast<size_t>(destination) * static_cast<size_t>(inputChannels) + static_cast<size_t>(source);
-        };
+            {
+                return static_cast<size_t>(destination) * static_cast<size_t>(inputChannels) + static_cast<size_t>(source);
+            };
 
         channelMap[index(0, 0)] = stereo.Left;
         if (outputChannels >= 2)
         {
             channelMap[index(1, 1)] = stereo.Right;
         }
-
-        return SDL_AudioStreamSetChannelMap(instance.Stream, channelMap.data(), inputChannels, outputChannels);
-    }
-
-    bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)
-    {
-        if (!instance.Stream)
-        {
-            return false;
-        }
-
-        const bool wasLooping = instance.Loop;
-        const StereoSpace previousSpace = instance.SpatialGain;
-
-        instance.Volume = params.Volume;
-        instance.Pitch = params.Pitch;
-        instance.Speed = params.Speed;
-        instance.Loop = params.Looping;
-
-        if (instance.Spatial)
-        {
-            instance.SpatialGain = params.Stereo;
-        }
-        else
-        {
-            instance.SpatialGain = StereoSpace{};
-        }
-
-        const float ratio = std::clamp(instance.Pitch * instance.Speed, 0.01f, 100.0f);
-        if (!SDL_SetAudioStreamFrequencyRatio(instance.Stream, ratio))
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream playback ratio: {}", SDL_GetError());
-        }
-
-        if (!SDL_SetAudioStreamGain(instance.Stream, instance.Volume))
-        {
-            TBX_TRACE_WARNING("SDL3Audio: Failed to adjust audio stream volume: {}", SDL_GetError());
-        }
-
-        if (!instance.IsPlaying)
-        {
-            return true;
-        }
-
-        const bool spatialChanged = instance.Spatial && (previousSpace.Left != instance.SpatialGain.Left || previousSpace.Right != instance.SpatialGain.Right);
-        if (spatialChanged)
-        {
-            if (!ConfigureChannelMap(instance, instance.SpatialGain))
-            {
-                TBX_TRACE_WARNING("SDL3Audio: Unable to refresh spatial channel map: {}", SDL_GetError());
-            }
-        }
-
-        if (instance.Loop)
-        {
-            const int queued = SDL_GetAudioStreamQueued(instance.Stream);
-            if (queued < 0)
-            {
-                TBX_TRACE_WARNING("SDL3Audio: Failed to query queued audio for asset {}: {}", audio.Id.ToString(), SDL_GetError());
-                return true;
-            }
-
-            if (queued == 0 || !wasLooping)
-            {
-                return SubmitAudioData(instance, audio, false);
-            }
-        }
-
+        int count;
+        return SDL_SetAudioStreamOutputChannelMap(instance.Stream, channelMap.data(), count);*/
         return true;
-    }
-
-    void SDL3AudioPlugin::Stop(const Audio& audio)
-    {
-        auto it = _playbackInstances.find(audio.Id);
-        if (it == _playbackInstances.end())
-        {
-            return;
-        }
-
-        it->second.IsPlaying = false;
-        RemovePlayback(audio, it->second);
-    }
-
-    void SDL3AudioPlugin::SetPitch(const Audio& audio, float pitch)
-    {
-        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
-        if (instance == nullptr)
-        {
-            return;
-        }
-
-        PlaybackParams params = BuildParamsFromInstance(*instance);
-        params.Pitch = pitch;
-
-        if (!SetPlaybackParams(*instance, audio, params))
-        {
-            RemovePlayback(audio, *instance);
-        }
-    }
-
-    void SDL3AudioPlugin::SetPlaybackSpeed(const Audio& audio, float speed)
-    {
-        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
-        if (instance == nullptr)
-        {
-            return;
-        }
-
-        PlaybackParams params = BuildParamsFromInstance(*instance);
-        params.Speed = speed;
-
-        if (!SetPlaybackParams(*instance, audio, params))
-        {
-            RemovePlayback(audio, *instance);
-        }
-    }
-
-    void SDL3AudioPlugin::SetLooping(const Audio& audio, bool loop)
-    {
-        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
-        if (instance == nullptr)
-        {
-            return;
-        }
-
-        PlaybackParams params = BuildParamsFromInstance(*instance);
-        params.Looping = loop;
-
-        if (!SetPlaybackParams(*instance, audio, params))
-        {
-            RemovePlayback(audio, *instance);
-        }
-    }
-
-    void SDL3AudioPlugin::SetVolume(const Audio& audio, float volume)
-    {
-        PlaybackInstance* instance = GetOrCreatePlayback(audio, nullptr, false);
-        if (instance == nullptr)
-        {
-            return;
-        }
-
-        PlaybackParams params = BuildParamsFromInstance(*instance);
-        params.Volume = volume;
-
-        if (!SetPlaybackParams(*instance, audio, params))
-        {
-            RemovePlayback(audio, *instance);
-        }
-    }
-
-    bool SDL3AudioPlugin::CanLoad(const std::filesystem::path& filepath) const
-    {
-        return IsSupportedExtension(filepath);
-    }
-
-    Audio SDL3AudioPlugin::LoadAudio(const std::filesystem::path& filepath)
-    {
-        SDL_AudioSpec sourceSpec = {};
-        Uint8* rawBuffer = nullptr;
-        Uint32 rawLength = 0;
-
-        if (filepath.extension() == ".wav" || filepath.extension() == ".wave")
-        {
-            if (!SDL_LoadWAV(filepath.string().c_str(), &sourceSpec, &rawBuffer, &rawLength))
-            {
-                TBX_TRACE_ERROR("SDL3Audio: Failed to load '{}': {}", filepath.string(), SDL_GetError());
-                return Audio();
-            }
-        }
-        else
-        {
-            TBX_ASSERT(false, "SDL3Audio: Unsupported audio file format.");
-            return Audio();
-        }
-
-        SDL_AudioSpec targetSpec = sourceSpec;
-        targetSpec.format = SDL_AUDIO_F32;
-
-        Uint8* convertedBuffer = nullptr;
-        int convertedLength = 0;
-        bool converted = SDL_ConvertAudioSamples(&sourceSpec, rawBuffer, static_cast<int>(rawLength), &targetSpec, &convertedBuffer, &convertedLength);
-        SDL_free(rawBuffer);
-
-        if (!converted)
-        {
-            TBX_TRACE_ERROR("SDL3Audio: Failed to convert audio '{}': {}", filepath.string(), SDL_GetError());
-            return Audio();
-        }
-
-        AudioFormat format = ConvertSpecToFormat(targetSpec);
-        Audio::SampleData samples(convertedBuffer, convertedBuffer + convertedLength);
-        SDL_free(convertedBuffer);
-
-        return Audio(std::move(samples), format);
     }
 
     bool SDL3AudioPlugin::SubmitAudioData(PlaybackInstance& instance, const Audio& audio, bool resetStream)
