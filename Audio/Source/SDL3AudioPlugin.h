@@ -21,13 +21,6 @@ namespace Tbx::Plugins::SDL3Audio
         StereoSpace Gain = {};
     };
 
-    enum class PlaybackReuseResult
-    {
-        None,
-        Reused,
-        Abort
-    };
-
     struct PlaybackInstance
     {
         SDL_AudioStream* Stream = nullptr;
@@ -40,18 +33,27 @@ namespace Tbx::Plugins::SDL3Audio
         StereoSpace SpatialGain = {};
     };
 
+    struct PlaybackParams
+    {
+        float Volume = 1.0f;
+        float Pitch = 1.0f;
+        float Speed = 1.0f;
+        bool Looping = false;
+        StereoSpace Stereo = {};
+    };
+
     class SDL3AudioPlugin final
         : public Plugin
         , public IAudioMixer
         , public IAudioLoader
     {
     public:
-        explicit SDL3AudioPlugin(Ref<EventBus> eventBus);
+        SDL3AudioPlugin(Ref<EventBus> eventBus);
         ~SDL3AudioPlugin() override;
 
         // IAudioMixer
         void Play(const Audio& audio) override;
-        void PlayFromPosition(const Audio& audio, const Vector3& position) override;
+        void SetPosition(const Audio& audio, const Vector3& position) override;
         void Stop(const Audio& audio) override;
         void SetPitch(const Audio& audio, float pitch) override;
         void SetPlaybackSpeed(const Audio& audio, float speed) override;
@@ -65,14 +67,17 @@ namespace Tbx::Plugins::SDL3Audio
         Audio LoadAudio(const std::filesystem::path& filepath) override;
 
     private:
-        void ApplyStreamTuning(PlaybackInstance& instance, const Audio& audio);
-        bool QueueAudioData(PlaybackInstance& instance, const Audio& audio);
+        bool SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params);
+        PlaybackInstance* GetOrCreatePlayback(const Audio& audio, const SpatialSettings* spatial, bool createIfMissing);
+        bool BuildPlaybackStream(PlaybackInstance& instance, const Audio& audio, const SpatialSettings& settings);
+        bool ConfigureChannelMap(PlaybackInstance& instance, const StereoSpace& stereo);
+        bool SubmitAudioData(PlaybackInstance& instance, const Audio& audio, bool resetStream);
+        void StartPlayback(const Audio& audio, const SpatialSettings& spatial);
+        void RemovePlayback(const Audio& audio, PlaybackInstance& instance);
         void DestroyPlayback(PlaybackInstance& instance);
 
-        SpatialSettings ResolveSpatialSettings(const Audio& audio, const Vector3* position) const;
-        PlaybackReuseResult ReusePlaybackInstance(const Audio& audio, const SpatialSettings& settings);
-        bool PrepareSourceSpec(SDL_AudioSpec& sourceSpec, const Audio& audio, const SpatialSettings& settings) const;
-        void BeginPlayback(const Audio& audio, const Vector3* position);
+        SpatialSettings ResolveSpatialSettings(const Audio& audio) const;
+        SpatialSettings ResolveSpatialSettings(const Audio& audio, const Vector3& position) const;
 
         static bool IsSupportedExtension(const std::filesystem::path& path);
         static AudioFormat ConvertSpecToFormat(const SDL_AudioSpec& spec);
