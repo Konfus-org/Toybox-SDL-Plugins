@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <unordered_map>
 
-namespace Tbx::Plugins::SDL
+namespace Tbx::Plugins::SDL3Audio
 {
     class SDL3AudioPlugin final
         : public Plugin

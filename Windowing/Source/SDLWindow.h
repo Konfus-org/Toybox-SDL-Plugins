@@ -1,5 +1,6 @@
 #pragma once
-#include <Tbx/Windowing/Window.h>
+#include "Tbx/Windowing/Window.h"
+#include "Tbx/Events/EventCarrier.h"
 #include <SDL3/SDL_video.h>
 
 namespace Tbx::Plugins::SDLWindowing
@@ -38,7 +39,7 @@ namespace Tbx::Plugins::SDLWindowing
         SDL_GLContext _glContext = nullptr;
         SDL_Window* _window = nullptr;
         WeakRef<Window> _this = {};
-        Ref<EventBus> _eventBus = nullptr;
+        EventCarrier _eventCarrier = {};
         WindowMode _currentMode = WindowMode::Windowed;
         Size _size = { 800, 800 };
         std::string _title = "New Window";

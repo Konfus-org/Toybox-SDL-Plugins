@@ -1,8 +1,8 @@
 #pragma 
-#include <Tbx/Plugins/Plugin.h>
-#include <Tbx/Windowing/Window.h>
-#include <Tbx/Events/AppEvents.h>
-#include <Tbx/Events/EventListener.h>
+#include "Tbx/Plugins/Plugin.h"
+#include "Tbx/Windowing/Window.h"
+#include "Tbx/Events/AppEvents.h"
+#include "Tbx/Events/EventListener.h"
 
 namespace Tbx::Plugins::SDLWindowing
 {
@@ -21,7 +21,6 @@ namespace Tbx::Plugins::SDLWindowing
             Ref<EventBus> eventBus) override;
 
     private:
-        void OnAppLaunched(const AppLaunchedEvent& e);
         void OnAppSettingsChanged(const AppSettingsChangedEvent& e);
         void DeleteWindow(Window* window);
 

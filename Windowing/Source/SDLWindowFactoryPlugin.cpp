@@ -8,8 +8,8 @@ namespace Tbx::Plugins::SDLWindowing
         : _listener(eventBus)
         , _usingOpenGl(false)
     {
-        TBX_ASSERT(SDL_Init(SDL_INIT_VIDEO)  != 0, "Failed to initialize SDL");
-        _listener.Listen(this, &SDLWindowFactoryPlugin::OnAppSettingsChanged);
+        TBX_ASSERT(SDL_Init(SDL_INIT_VIDEO) != 0, "Failed to initialize SDL");
+        _listener.Listen<AppSettingsChangedEvent>([this](const AppSettingsChangedEvent& e) { OnAppSettingsChanged(e); });
     }
 
     SDLWindowFactoryPlugin::~SDLWindowFactoryPlugin()
