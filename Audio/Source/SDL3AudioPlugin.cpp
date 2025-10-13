@@ -282,6 +282,7 @@ namespace Tbx::Plugins::SDL3Audio
     {
         if (!instance.Stream)
         {
+            TBX_TRACE_WARNING("SDL3Audio: Unsupported audio sample format for asset {}.", audio.Id.ToString());
             return false;
         }
 
