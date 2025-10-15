@@ -25,11 +25,6 @@ namespace Tbx::Plugins::SDLWindowing
         return _window;
     }
 
-    void SDLWindow::SetThis(WeakRef<Window> window)
-    {
-        _this = window;
-    }
-
     void SDLWindow::Open()
     {
         _isClosed = false;
@@ -60,7 +55,7 @@ namespace Tbx::Plugins::SDLWindowing
 
         _window = SDL_CreateWindow(_title.c_str(), _size.Width, _size.Height, flags);
         TBX_ASSERT(_window, "SDLWindow: SDL_CreateWindow failed: %s", SDL_GetError());
-        _eventCarrier.Post(WindowOpenedEvent(_this.lock()));
+        _eventCarrier.Post(WindowOpenedEvent(this));
     }
 
     void SDLWindow::Close()
@@ -79,7 +74,7 @@ namespace Tbx::Plugins::SDLWindowing
             SDL_GL_DestroyContext(_glContext);
         }
 
-        _eventCarrier.Post(WindowClosedEvent(_this.lock()));
+        _eventCarrier.Post(WindowClosedEvent(this));
     }
 
     void SDLWindow::Update()
@@ -145,7 +140,7 @@ namespace Tbx::Plugins::SDLWindowing
         {
             SDL_GL_MakeCurrent(_window, _glContext);
         }
-        _eventCarrier.Post(WindowFocusedEvent(_this.lock()));
+        _eventCarrier.Post(WindowFocusedEvent(this));
     }
 
     bool SDLWindow::IsClosed()
@@ -190,7 +185,7 @@ namespace Tbx::Plugins::SDLWindowing
         }
 
         SDL_SetWindowSize(_window, _size.Width, _size.Height);
-        _eventCarrier.Post(WindowResizedEvent(_this.lock()));
+        _eventCarrier.Post(WindowResizedEvent(this));
     }
 
     void SDLWindow::SetMode(const WindowMode& mode)

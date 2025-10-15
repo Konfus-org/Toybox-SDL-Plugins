@@ -27,16 +27,9 @@ namespace Tbx::Plugins::SDLWindowing
     {
         auto* sdlWindow = new SDLWindow(_usingOpenGl, eventBus);
         auto window = std::shared_ptr<Window>((Window*)sdlWindow, [this](Window* win) { DeleteWindow(win); });
-
-        // HACK: used to get around enable shared from this issues
-        {
-            sdlWindow->SetThis(window);
-        }
-
         window->SetTitle(title);
         window->SetSize(size);
         window->SetMode(mode);
-
         return window;
     }
 

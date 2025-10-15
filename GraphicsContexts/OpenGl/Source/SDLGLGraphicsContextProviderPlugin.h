@@ -11,8 +11,8 @@ namespace Tbx::Plugins::SDLGraphicsContext
     {
     public:
         SDLOpenGlGraphicsContextsProviderPlugin(Ref<EventBus> eventBus) {}
-       GraphicsApi GetApi() const override;
-       Ref<IGraphicsContext> Provide(Ref<Window> window) override;
+        GraphicsApi GetApi() const override;
+        Ref<IGraphicsContext> Provide(const Window* window) override;
 
     private:
         void DeleteGraphicsContext(IGraphicsContext* context);

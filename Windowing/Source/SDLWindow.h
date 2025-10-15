@@ -15,9 +15,6 @@ namespace Tbx::Plugins::SDLWindowing
         NativeHandle GetNativeHandle() const override;
         NativeWindow GetNativeWindow() const override;
 
-        // HACK: used to get around enable shared from this issues
-        void SetThis(WeakRef<Window> window);
-
         void Open() override;
         void Close() override;
         void Update() override;
@@ -38,7 +35,6 @@ namespace Tbx::Plugins::SDLWindowing
     private:
         SDL_GLContext _glContext = nullptr;
         SDL_Window* _window = nullptr;
-        WeakRef<Window> _this = {};
         EventCarrier _eventCarrier = {};
         WindowMode _currentMode = WindowMode::Windowed;
         Size _size = { 800, 800 };
