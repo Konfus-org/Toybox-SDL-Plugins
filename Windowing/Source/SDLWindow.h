@@ -30,7 +30,7 @@ namespace Tbx::Plugins::SDLWindowing
         const Size& GetSize() const override;
 
         void SetMode(const WindowMode& mode) override;
-        WindowMode GetMode() override;
+        WindowMode GetMode() const override;
 
     private:
         SDL_GLContext _glContext = nullptr;

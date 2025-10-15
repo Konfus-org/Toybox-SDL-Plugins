@@ -38,19 +38,20 @@ namespace Tbx::Plugins::SDLWindowing
         switch (_currentMode)
         {
             using enum WindowMode;
-        case Windowed:   break;
-        case Fullscreen: flags |= SDL_WINDOW_FULLSCREEN; break;
-        case Borderless: flags |= SDL_WINDOW_BORDERLESS; break;
-        case FullscreenBorderless:
-        {
-            flags |= SDL_WINDOW_FULLSCREEN;
-            flags |= SDL_WINDOW_BORDERLESS;
-            break;
-        }
-        default:
-        {
-            TBX_ASSERT(false, "Invalid window mode");
-        }
+            case Windowed:   break;
+            case Fullscreen: flags |= SDL_WINDOW_FULLSCREEN; break;
+            case Borderless: flags |= SDL_WINDOW_BORDERLESS; break;
+            case FullscreenBorderless:
+            {
+                flags |= SDL_WINDOW_FULLSCREEN;
+                flags |= SDL_WINDOW_BORDERLESS;
+                break;
+            }
+            default:
+            {
+                TBX_ASSERT(false, "Invalid window mode");
+            }
+            _eventCarrier.Post(WindowModeChangedEvent(this));
         }
 
         _window = SDL_CreateWindow(_title.c_str(), _size.Width, _size.Height, flags);
@@ -83,57 +84,56 @@ namespace Tbx::Plugins::SDLWindowing
         SDL_PollEvent(&e);
         switch (e.type)
         {
-        case SDL_EVENT_QUIT:
-        {
-            Close();
-            break;
-        }
-        case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
-        {
-            if (e.window.windowID == SDL_GetWindowID(_window))
+            case SDL_EVENT_QUIT:
             {
-                int w, h;
-                SDL_GetWindowSize(_window, &w, &h);
-                SetSize(Size(w, h));
-                SetMode(WindowMode::Fullscreen);
+                Close();
+                break;
             }
-            break;
-        }
-        case SDL_EVENT_WINDOW_RESIZED:
-        {
-            if (e.window.windowID == SDL_GetWindowID(_window))
-            {
-                int w, h;
-                SDL_GetWindowSize(_window, &w, &h);
-                SetSize(Size(w, h));
-            }
-            break;
-        }
-        case SDL_EVENT_WINDOW_FOCUS_GAINED:
-        {
-            if (e.window.windowID == SDL_GetWindowID(_window))
-            {
-                Focus();
-            }
-            break;
-        }
-        case SDL_EVENT_WINDOW_FOCUS_LOST:
-        {
-            if (e.window.windowID == SDL_GetWindowID(_window))
-            {
-                _isFocused = false;
-            }
-        }
         }
 
-        if (_useOpenGl)
+        int w, h;
+        SDL_GetWindowSize(_window, &w, &h);
+        SetSize(Size(w, h));
+
+        auto flags = SDL_GetWindowFlags(_window);
+        if (flags & SDL_WINDOW_FULLSCREEN)
         {
-            SDL_GL_SwapWindow(_window);
+            SetMode(WindowMode::Fullscreen);
+        }
+        else if (flags & SDL_WINDOW_FULLSCREEN & SDL_WINDOW_BORDERLESS)
+        {
+            SetMode(WindowMode::FullscreenBorderless);
+        }
+        else if (flags & SDL_WINDOW_BORDERLESS)
+        {
+            SetMode(WindowMode::Borderless);
+        }
+        else if (flags & SDL_WINDOW_MINIMIZED)
+        {
+            SetMode(WindowMode::Minimized);
+        }
+        else
+        {
+            SetMode(WindowMode::Windowed);
+        }
+
+        if (flags & SDL_WINDOW_INPUT_FOCUS)
+        {
+            Focus();
+        }
+        else
+        {
+            _isFocused = false;
         }
     }
 
     void SDLWindow::Focus()
     {
+        if (_isFocused)
+        {
+            return;
+        }
+
         _isFocused = true;
         SDL_RaiseWindow(_window);
         if (_useOpenGl)
@@ -178,8 +178,7 @@ namespace Tbx::Plugins::SDLWindowing
     void SDLWindow::SetSize(const Size& size)
     {
         _size = size;
-
-        if (!_window)
+        if (_size.GetAspectRatio() == size.GetAspectRatio())
         {
             return;
         }
@@ -190,6 +189,11 @@ namespace Tbx::Plugins::SDLWindowing
 
     void SDLWindow::SetMode(const WindowMode& mode)
     {
+        if (mode == _currentMode)
+        {
+            return;
+        }
+
         _currentMode = mode;
         if (_window == nullptr)
         {
@@ -199,33 +203,40 @@ namespace Tbx::Plugins::SDLWindowing
         switch (_currentMode)
         {
             using enum WindowMode;
-        case Windowed:
-        {
-            SDL_SetWindowFullscreen(_window, false);
-            SDL_SetWindowBordered(_window, true);
-            break;
+            case Windowed:
+            {
+                SDL_SetWindowFullscreen(_window, false);
+                SDL_SetWindowBordered(_window, true);
+                break;
+            }
+            case Fullscreen:
+            {
+                SDL_SetWindowFullscreen(_window, true);
+                break;
+            }
+            case Borderless:
+            {
+                SDL_SetWindowFullscreen(_window, false);
+                SDL_SetWindowBordered(_window, false);
+                break;
+            }
+            case FullscreenBorderless:
+            {
+                SDL_SetWindowFullscreen(_window, true);
+                SDL_SetWindowBordered(_window, false);
+                break;
+            }
+            case Minimized:
+            {
+                SDL_MinimizeWindow(_window);
+                break;
+            }
         }
-        case Fullscreen:
-        {
-            SDL_SetWindowFullscreen(_window, true);
-            break;
-        }
-        case Borderless:
-        {
-            SDL_SetWindowFullscreen(_window, false);
-            SDL_SetWindowBordered(_window, false);
-            break;
-        }
-        case FullscreenBorderless:
-        {
-            SDL_SetWindowFullscreen(_window, true);
-            SDL_SetWindowBordered(_window, false);
-            break;
-        }
-        }
+
+        _eventCarrier.Post(WindowModeChangedEvent(this));
     }
 
-    WindowMode SDLWindow::GetMode()
+    WindowMode SDLWindow::GetMode() const
     {
         return _currentMode;
     }

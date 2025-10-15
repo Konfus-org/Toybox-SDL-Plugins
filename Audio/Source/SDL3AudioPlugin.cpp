@@ -114,6 +114,17 @@ namespace Tbx::Plugins::SDL3Audio
         StartPlayback(audio, ResolveSpatialSettings(audio));
     }
 
+    void SDL3AudioPlugin::Pause(const Audio& audio)
+    {
+        auto it = _playbackInstances.find(audio.Id);
+        if (it == _playbackInstances.end())
+        {
+            return;
+        }
+
+        SDL_PauseAudioStreamDevice(it->second.Stream);
+    }
+
     void SDL3AudioPlugin::Stop(const Audio& audio)
     {
         auto it = _playbackInstances.find(audio.Id);
@@ -621,6 +632,7 @@ namespace Tbx::Plugins::SDL3Audio
         {
             RemovePlayback(audio, *instance);
         }
+        SDL_ResumeAudioStreamDevice(instance->Stream);
     }
 
     void SDL3AudioPlugin::RemovePlayback(const Audio& audio, PlaybackInstance& instance)
