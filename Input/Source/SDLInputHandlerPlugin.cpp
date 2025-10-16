@@ -40,7 +40,7 @@ namespace Tbx::Plugins::SDLInput
         }
     }
 
-    void SDLInputHandlerPlugin::UpdateInputState()
+    void SDLInputHandlerPlugin::Update()
     {
         // Store previous states
         _prevKeyState = _currKeyState;

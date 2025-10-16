@@ -19,7 +19,7 @@ namespace Tbx::Plugins::SDLInput
 		SDLInputHandlerPlugin(Ref<EventBus> eventBus);
 		~SDLInputHandlerPlugin() override;
 
-		void UpdateInputState() override;
+		void Update() override;
 
 		bool IsGamepadButtonDown(int playerIndex, int button) const override;
 		bool IsGamepadButtonUp(int playerIndex, int button) const override;
