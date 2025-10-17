@@ -25,8 +25,7 @@ namespace Tbx::Plugins::SDLWindowing
 
     std::shared_ptr<Window> SDLWindowFactoryPlugin::Create(const std::string& title, const Size& size, const WindowMode& mode, Ref<EventBus> eventBus)
     {
-        auto* sdlWindow = new SDLWindow(_usingOpenGl, eventBus);
-        auto window = std::shared_ptr<Window>((Window*)sdlWindow, [this](Window* win) { DeleteWindow(win); });
+        auto window = Produce(_usingOpenGl, eventBus);
         window->SetTitle(title);
         window->SetSize(size);
         window->SetMode(mode);
@@ -36,10 +35,5 @@ namespace Tbx::Plugins::SDLWindowing
     void SDLWindowFactoryPlugin::OnAppSettingsChanged(const AppSettingsChangedEvent& e)
     {
         _usingOpenGl = e.NewSettings.RenderingApi == GraphicsApi::OpenGL;
-    }
-
-    void SDLWindowFactoryPlugin::DeleteWindow(Window* window)
-    {
-        delete window;
     }
 }

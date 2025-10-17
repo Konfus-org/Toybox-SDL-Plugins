@@ -1,20 +1,20 @@
 #pragma 
+#include "SDLWindow.h"
 #include "Tbx/Plugins/Plugin.h"
-#include "Tbx/Windowing/Window.h"
 #include "Tbx/Events/AppEvents.h"
 #include "Tbx/Events/EventListener.h"
 
 namespace Tbx::Plugins::SDLWindowing
 {
     class SDLWindowFactoryPlugin final
-        : public Plugin
+        : public FactoryPlugin<SDLWindow>
         , public IWindowFactory
     {
     public:
         SDLWindowFactoryPlugin(Ref<EventBus> eventBus);
         ~SDLWindowFactoryPlugin() override;
 
-        std::shared_ptr<Window> Create(
+        Ref<Window> Create(
             const std::string& title,
             const Size& size,
             const WindowMode& mode,
@@ -22,7 +22,6 @@ namespace Tbx::Plugins::SDLWindowing
 
     private:
         void OnAppSettingsChanged(const AppSettingsChangedEvent& e);
-        void DeleteWindow(Window* window);
 
     private:
         EventListener _listener = {};

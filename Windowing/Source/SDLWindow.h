@@ -1,12 +1,12 @@
 #pragma once
 #include "Tbx/Windowing/Window.h"
+#include "Tbx/Plugins/Plugin.h"
 #include "Tbx/Events/EventCarrier.h"
 #include <SDL3/SDL_video.h>
 
 namespace Tbx::Plugins::SDLWindowing
 {
-    class SDLWindow 
-        : public Window
+    class SDLWindow : public Window, public IProductOfPluginFactory
     {
     public:
         SDLWindow(bool useOpenGl, Ref<EventBus> eventBus);

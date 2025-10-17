@@ -11,18 +11,12 @@ namespace Tbx::Plugins::SDLGraphicsContext
             TBX_ASSERT(false, "SDL OpenGL Graphics Context Provider: Given null window to provide context for.");
             return nullptr;
         }
-        return Ref<SDLGLGraphicsContext>(
-            new SDLGLGraphicsContext(std::any_cast<SDL_Window*>(window->GetNativeWindow())),
-            [this](SDLGLGraphicsContext* context) { DeleteGraphicsContext(context); });
+        auto* sdlWindow = std::any_cast<SDL_Window*>(window->GetNativeWindow());
+        return Produce(sdlWindow);
     }
 
-   GraphicsApi SDLOpenGlGraphicsContextsProviderPlugin::GetApi() const
+    GraphicsApi SDLOpenGlGraphicsContextsProviderPlugin::GetApi() const
     {
         return GraphicsApi::OpenGL;
-    }
-
-    void SDLOpenGlGraphicsContextsProviderPlugin::DeleteGraphicsContext(IGraphicsContext* context)
-    {
-        delete context;
     }
 }

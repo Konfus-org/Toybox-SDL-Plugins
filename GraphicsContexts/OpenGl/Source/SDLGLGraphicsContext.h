@@ -1,10 +1,11 @@
 #pragma once
 #include "Tbx/Graphics/GraphicsContext.h"
+#include "Tbx/Plugins/Plugin.h"
 #include <SDL3/SDL_video.h>
 
 namespace Tbx::Plugins::SDLGraphicsContext
 {
-    class SDLGLGraphicsContext final : public IGraphicsContext
+    class SDLGLGraphicsContext final : public IGraphicsContext, public IProductOfPluginFactory
     {
     public:
         SDLGLGraphicsContext(SDL_Window* window);

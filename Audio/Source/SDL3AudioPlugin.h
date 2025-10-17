@@ -8,6 +8,11 @@
 
 namespace Tbx::Plugins::SDL3Audio
 {
+    struct SDLAudio : public Audio, public IProductOfPluginFactory
+    {
+        using Audio::Audio;
+    };
+
     struct StereoSpace
     {
         float Left = 1.0f;
@@ -43,9 +48,9 @@ namespace Tbx::Plugins::SDL3Audio
     };
 
     class SDL3AudioPlugin final
-        : public Plugin
-        , public IAudioMixer
+        : public IAudioMixer
         , public IAudioLoader
+        , public FactoryPlugin<SDLAudio>
     {
     public:
         SDL3AudioPlugin(Ref<EventBus> eventBus);
@@ -65,7 +70,7 @@ namespace Tbx::Plugins::SDL3Audio
         bool CanLoad(const std::filesystem::path& filepath) const override;
 
     protected:
-        Audio LoadAudio(const std::filesystem::path& filepath) override;
+        Ref<Audio> LoadAudio(const std::filesystem::path& filepath) override;
 
     private:
         bool SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params);

@@ -22,6 +22,8 @@ namespace Tbx::Plugins::SDLInput
 
         SDL_AddEventWatch(PumpSDLEventToHandler, this);
         InitGamepads();
+
+        TBX_TRACE_INFO("SD3Input: SDL Input initialized.");
     }
 
     SDLInputHandlerPlugin::~SDLInputHandlerPlugin()
@@ -191,14 +193,14 @@ namespace Tbx::Plugins::SDLInput
             {
                 auto id = event->jdevice.which;
                 RegisterGamepad(id);
-                TBX_TRACE_INFO("Gamepad {} detected!", id);
+                TBX_TRACE_INFO("SD3Input: Gamepad {} detected!", id);
                 break;
             }
             case SDL_EVENT_JOYSTICK_REMOVED:
             {
                 int id = event->jdevice.which;
                 CloseGamepad(id);
-                TBX_TRACE_INFO("Gamepad {} disconnected.", id);
+                TBX_TRACE_INFO("SD3Input: Gamepad {} disconnected.", id);
                 break;
             }
             default:

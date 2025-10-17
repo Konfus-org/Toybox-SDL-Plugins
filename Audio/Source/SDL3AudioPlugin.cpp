@@ -85,6 +85,9 @@ namespace Tbx::Plugins::SDL3Audio
         {
             TBX_TRACE_WARNING("SDL3Audio: Unable to resume audio device: {}", SDL_GetError());
         }
+
+        TBX_TRACE_INFO("SDL3Audio: Initialized with device format {}, Hz {}, channels {}", 
+            _deviceSpec.freq, static_cast<int>(_deviceSpec.channels), SDL_GetAudioFormatName(_deviceSpec.format));
     }
 
     SDL3AudioPlugin::~SDL3AudioPlugin()
@@ -233,7 +236,7 @@ namespace Tbx::Plugins::SDL3Audio
         return IsSupportedExtension(filepath);
     }
 
-    Audio SDL3AudioPlugin::LoadAudio(const std::filesystem::path& filepath)
+    Ref<Audio> SDL3AudioPlugin::LoadAudio(const std::filesystem::path& filepath)
     {
         SDL_AudioSpec sourceSpec = {};
         Uint8* rawBuffer = nullptr;
@@ -244,13 +247,13 @@ namespace Tbx::Plugins::SDL3Audio
             if (!SDL_LoadWAV(filepath.string().c_str(), &sourceSpec, &rawBuffer, &rawLength))
             {
                 TBX_TRACE_ERROR("SDL3Audio: Failed to load '{}': {}", filepath.string(), SDL_GetError());
-                return Audio();
+                return nullptr;
             }
         }
         else
         {
             TBX_ASSERT(false, "SDL3Audio: Unsupported audio file format.");
-            return Audio();
+            return nullptr;
         }
 
         SDL_AudioSpec targetSpec = sourceSpec;
@@ -264,14 +267,14 @@ namespace Tbx::Plugins::SDL3Audio
         if (!converted)
         {
             TBX_TRACE_ERROR("SDL3Audio: Failed to convert audio '{}': {}", filepath.string(), SDL_GetError());
-            return Audio();
+            return nullptr;
         }
 
         AudioFormat format = ConvertSpecToFormat(targetSpec);
-        Audio::SampleData samples(convertedBuffer, convertedBuffer + convertedLength);
+        SampleData samples(convertedBuffer, convertedBuffer + convertedLength);
         SDL_free(convertedBuffer);
 
-        return Audio(std::move(samples), format);
+        return Produce(samples, format);
     }
 
     bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)
