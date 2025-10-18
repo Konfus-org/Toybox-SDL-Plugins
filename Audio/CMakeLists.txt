@@ -13,17 +13,10 @@ target_include_directories(${LibName}
     $<INSTALL_INTERFACE:Source>
 )
 
-set_target_properties(${LibName} PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
-
-if(TARGET SDL3::SDL3)
-  target_link_libraries(${LibName} PRIVATE SDL3::SDL3)
-elseif(TARGET SDL3-shared)
-  target_link_libraries(${LibName} PRIVATE SDL3-shared)
-else()
-  message(FATAL_ERROR "SDL3Audio plugin requires SDL3 to be built")
-endif()
-
-target_link_libraries(${LibName} PRIVATE Tbx::Engine)
+target_link_libraries(${LibName} PRIVATE 
+    Tbx::Engine
+    SDL3-shared
+)
 
 add_custom_command(TARGET ${LibName} POST_BUILD
   COMMENT "Copying plugin meta file to build dir"
