@@ -56,7 +56,6 @@ namespace Tbx::Plugins::SDL3Audio
         SDL3AudioPlugin(Ref<EventBus> eventBus);
         ~SDL3AudioPlugin() override;
 
-        // IAudioMixer
         void Play(const Audio& audio) override;
         void Pause(const Audio& audio) override;
         void Stop(const Audio& audio) override;
@@ -66,7 +65,6 @@ namespace Tbx::Plugins::SDL3Audio
         void SetLooping(const Audio& audio, bool loop) override;
         void SetVolume(const Audio& audio, float volume) override;
 
-        // IAudioLoader
         bool CanLoad(const std::filesystem::path& filepath) const override;
 
     protected:
