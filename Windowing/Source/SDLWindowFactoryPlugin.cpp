@@ -25,7 +25,7 @@ namespace Tbx::Plugins::SDLWindowing
 
     std::shared_ptr<Window> SDLWindowFactoryPlugin::Create(const std::string& title, const Size& size, const WindowMode& mode, Ref<EventBus> eventBus)
     {
-        auto window = Produce(_usingOpenGl, eventBus);
+        auto window = FactoryPlugin<SDLWindow>::Create(_usingOpenGl, eventBus);
         window->SetTitle(title);
         window->SetSize(size);
         window->SetMode(mode);

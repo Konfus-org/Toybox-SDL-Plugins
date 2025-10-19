@@ -274,7 +274,7 @@ namespace Tbx::Plugins::SDL3Audio
         SampleData samples(convertedBuffer, convertedBuffer + convertedLength);
         SDL_free(convertedBuffer);
 
-        return Produce(samples, format);
+        return Create(samples, format);
     }
 
     bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)

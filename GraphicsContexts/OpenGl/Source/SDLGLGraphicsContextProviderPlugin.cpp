@@ -12,7 +12,7 @@ namespace Tbx::Plugins::SDLGraphicsContext
             return nullptr;
         }
         auto* sdlWindow = std::any_cast<SDL_Window*>(window->GetNativeWindow());
-        return Produce(sdlWindow);
+        return Create(sdlWindow);
     }
 
     GraphicsApi SDLOpenGlGraphicsContextsProviderPlugin::GetApi() const
