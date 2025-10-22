@@ -1,27 +1,36 @@
-set(LibName SDL3Audio)
-add_library(${LibName} SHARED)
+add_library(SDL3Audio SHARED)
 
-file(GLOB_RECURSE SRCS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp")
-file(GLOB_RECURSE INCL CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.h")
+# Sources
+file(GLOB_RECURSE INCL CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Include/*.*")
+file(GLOB_RECURSE SRCS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.*")
 file(GLOB_RECURSE META CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.meta")
+target_sources(SDL3Audio PRIVATE ${SRCS} ${INCL} ${META})
 
-target_sources(${LibName} PRIVATE ${SRCS} ${INCL} ${META})
-
-target_include_directories(${LibName}
+# Expose include dirs to dependents (build & install time)
+target_include_directories(SDL3Audio
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Source>
-    $<INSTALL_INTERFACE:Source>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Include>
+    $<INSTALL_INTERFACE:Include>
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Source
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(${LibName} PRIVATE 
-    Tbx::Engine
-    SDL3-shared
+# C++20
+set_target_properties(SDL3Audio PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
+
+# Link libs
+target_link_libraries(SDL3Audio PRIVATE
+  Tbx::Engine
+  SDL3-shared
 )
 
-add_custom_command(TARGET ${LibName} POST_BUILD
+# Copy plugin meta file to build dir
+add_custom_command(TARGET SDL3Audio POST_BUILD
   COMMENT "Copying plugin meta file to build dir"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          "${CMAKE_CURRENT_SOURCE_DIR}/${LibName}.meta"
-          "$<TARGET_FILE_DIR:${LibName}>/${LibName}.meta")
+          "${CMAKE_CURRENT_SOURCE_DIR}/SDL3Audio.meta"
+          "$<TARGET_FILE_DIR:SDL3Audio>/SDL3Audio.meta")
 
-add_library(Tbx::Plugin::${LibName} ALIAS ${LibName})
+# Namespaced alias for consumers
+add_library(Tbx::Plugin::SDL3Audio ALIAS SDL3Audio)

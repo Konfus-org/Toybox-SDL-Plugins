@@ -15,9 +15,9 @@ namespace Tbx::Plugins::SDL3Audio
     // volume while the horizontal angle determines a simple left/right pan.
     static StereoSpace CalculateSpatialGains(const Vector3& position)
     {
-        const float x = static_cast<float>(position.X);
-        const float y = static_cast<float>(position.Y);
-        const float z = static_cast<float>(position.Z);
+        const float x = position.X;
+        const float y = position.Y;
+        const float z = position.Z;
 
         // Use an inverse distance rolloff so sounds closer than the reference distance
         // remain at full volume and gradually attenuate as they move away.
@@ -273,8 +273,9 @@ namespace Tbx::Plugins::SDL3Audio
         AudioFormat format = ConvertSpecToFormat(targetSpec);
         SampleData samples(convertedBuffer, convertedBuffer + convertedLength);
         SDL_free(convertedBuffer);
-
-        return Create(samples, format);
+        auto audio = MakeRef<SDLAudio>(samples, format);
+        //audio->Owner = shared_from_this();
+        return audio;
     }
 
     bool SDL3AudioPlugin::SetPlaybackParams(PlaybackInstance& instance, const Audio& audio, const PlaybackParams& params)
