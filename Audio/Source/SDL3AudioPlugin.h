@@ -66,7 +66,7 @@ namespace Tbx::Plugins::SDL3Audio
         void SetLooping(const Audio& audio, bool loop) override;
         void SetVolume(const Audio& audio, float volume) override;
 
-        bool CanLoad(const std::filesystem::path& filepath) const override;
+        bool CanLoadAudio(const std::filesystem::path& filepath) const override;
 
     protected:
         Ref<Audio> LoadAudio(const std::filesystem::path& filepath) override;

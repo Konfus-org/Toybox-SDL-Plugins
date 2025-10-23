@@ -231,7 +231,7 @@ namespace Tbx::Plugins::SDL3Audio
         }
     }
 
-    bool SDL3AudioPlugin::CanLoad(const std::filesystem::path& filepath) const
+    bool SDL3AudioPlugin::CanLoadAudio(const std::filesystem::path& filepath) const
     {
         return IsSupportedExtension(filepath);
     }
